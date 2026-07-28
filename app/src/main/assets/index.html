@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MiniEngine2D</title>
+<style>
+  :root{
+    --ink:#0d0b18;
+    --dusk:#1a1530;
+    --dusk-2:#241d3f;
+    --rune:#3a3260;
+    --gold:#ffb648;
+    --ember:#ff6b6b;
+    --mist:#f2eeff;
+    --mist-dim:#9c92c2;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; padding:0; height:100%; background:var(--ink); color:var(--mist); font-family:var(--sans); overflow:hidden; }
+  button, input, textarea, select{ font-family:inherit; color:inherit; }
+  #app{ display:flex; flex-direction:column; height:100vh; }
+
+  /* ---------- Preview (top half) ---------- */
+  #previewPane{ flex:0 0 44%; background:var(--dusk); display:flex; flex-direction:column; border-bottom:1px solid var(--rune); min-height:0; }
+  #previewHeader{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--mist-dim);
+    border-bottom:1px solid var(--rune); flex:0 0 auto; }
+  #previewHeader .live{ display:inline-flex; align-items:center; gap:6px; }
+  #previewHeader .dot{ width:7px;height:7px;border-radius:50%; background:var(--gold); display:inline-block;
+    animation: pulse 2s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){ #previewHeader .dot{ animation:none; } }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+  #canvasWrap{ flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:14px; min-height:0; }
+  #gameCanvas{ background:var(--ink); border-radius:3px; max-width:100%; max-height:100%;
+    box-shadow: 0 0 0 2px var(--dusk-2), 0 0 0 4px var(--gold); touch-action:none; }
+
+  /* ---------- Resource toolbar ---------- */
+  #toolbar{ flex:0 0 auto; background:var(--dusk-2); border-bottom:1px solid var(--rune);
+    display:flex; gap:6px; padding:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .tbtn{ flex:0 0 auto; background:var(--dusk); color:var(--mist); border:1px solid var(--rune); border-radius:4px;
+    padding:8px 10px; font-family:var(--mono); font-size:11px; letter-spacing:.03em; white-space:nowrap;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 1px 0 rgba(0,0,0,.4); }
+  .tbtn.add{ color:var(--ink); background:var(--gold); border-color:var(--gold); font-weight:700; }
+  .tbtn:active{ transform:translateY(1px); box-shadow:none; }
+
+  #palette{ flex:0 0 auto; display:flex; gap:6px; padding:8px; overflow-x:auto; background:var(--dusk-2);
+    border-bottom:1px solid var(--rune); -webkit-overflow-scrolling:touch; }
+  #palette:empty{ display:none; }
+  .chip{ flex:0 0 auto; display:flex; align-items:center; gap:6px; background:var(--dusk); border:1px solid var(--rune);
+    border-radius:3px; padding:5px 8px; font-family:var(--mono); font-size:11px; color:var(--mist-dim); white-space:nowrap; }
+  .chip .sw{ width:10px;height:10px;border-radius:2px; border:1px solid rgba(255,255,255,.25); flex:0 0 auto; }
+  .chip .nm{ color:var(--mist); }
+  .chip .kind{ opacity:.55; font-size:10px; }
+
+  /* ---------- Editor (bottom half) ---------- */
+  #editorPane{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  #editorHeader{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--mist-dim);
+    border-bottom:1px solid var(--rune); flex:0 0 auto; }
+  #runBtn{ background:var(--gold); color:var(--ink); border:none; border-radius:4px; padding:6px 14px;
+    font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.04em; }
+  #runBtn:active{ transform:translateY(1px); }
+  #codeInput{ flex:1; width:100%; resize:none; border:none; outline:none; background:var(--ink); color:#d8ffe4;
+    font-family:var(--mono); font-size:13px; line-height:1.55; padding:12px; tab-size:2; border-top:2px solid transparent; }
+  #codeInput:focus{ border-top-color:var(--gold); }
+  #status{ flex:0 0 auto; padding:7px 12px; font-family:var(--mono); font-size:11px; min-height:16px;
+    color:var(--mist-dim); border-top:1px solid var(--rune); background:var(--dusk); }
+  #status.err{ color:var(--ember); }
+
+  /* ---------- Modal ---------- */
+  #modalBg{ position:fixed; inset:0; background:rgba(6,5,12,.65); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  #modalBg.open{ display:flex; }
+  #modal{ background:var(--dusk); width:100%; max-width:480px; border-radius:10px 10px 0 0; padding:16px;
+    max-height:82vh; overflow-y:auto; box-shadow:0 0 0 2px var(--gold) inset; }
+  #modal h3{ margin:0 0 12px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); }
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-family:var(--mono); font-size:10px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--mist-dim); margin-bottom:5px; }
+  .field input[type=text], .field input[type=number], .field textarea{
+    width:100%; background:var(--ink); border:1px solid var(--rune); border-radius:6px;
+    padding:9px 10px; color:var(--mist); font-size:14px; font-family:var(--sans); }
+  .field input[type=color]{ width:100%; height:38px; border:1px solid var(--rune); border-radius:6px; background:var(--ink); padding:3px; }
+  .row2{ display:flex; gap:8px; }
+  .row2 > .field{ flex:1; }
+  .modalBtns{ display:flex; gap:8px; margin-top:6px; }
+  .modalBtns button{ flex:1; padding:11px; border-radius:6px; border:1px solid var(--rune);
+    font-family:var(--mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
+  #saveBtn{ background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:700; }
+  #cancelBtn{ background:transparent; color:var(--mist-dim); }
+  #deleteBtn{ background:transparent; color:var(--ember); border-color:rgba(255,107,107,.35); }
+  #existingList{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  #existingList button{ background:var(--dusk-2); border:1px solid var(--rune); color:var(--mist); border-radius:4px;
+    padding:6px 10px; font-family:var(--mono); font-size:11px; }
+  #existingList button.active{ border-color:var(--gold); color:var(--gold); }
+  #existingList .hint{ font-family:var(--sans); font-size:12px; color:var(--mist-dim); }
+  .customProps .propRow{ display:flex; gap:6px; margin-bottom:6px; }
+  .customProps .propRow input{ flex:1; }
+  #addPropBtn{ background:transparent; border:1px dashed var(--rune); color:var(--mist-dim); border-radius:6px;
+    padding:8px; width:100%; font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+
+  /* Accessibility: visible focus ring everywhere except the code editor (handled above) */
+  button:focus-visible, input:focus-visible, select:focus-visible{
+    outline:2px solid var(--gold); outline-offset:2px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="previewPane">
+    <div id="previewHeader"><span class="live"><span class="dot"></span>Live Preview</span><span id="gridInfo"></span></div>
+    <div id="canvasWrap"><canvas id="gameCanvas"></canvas></div>
+  </div>
+
+  <div id="toolbar">
+    <button class="tbtn add" data-open="block">+ Block</button>
+    <button class="tbtn" data-edit="block">Edit Block</button>
+    <button class="tbtn add" data-open="character">+ Character</button>
+    <button class="tbtn" data-edit="character">Edit Character</button>
+    <button class="tbtn add" data-open="npc">+ NPC</button>
+    <button class="tbtn" data-edit="npc">Edit NPC</button>
+    <button class="tbtn add" data-open="mob">+ Mob</button>
+    <button class="tbtn" data-edit="mob">Edit Mob</button>
+    <button class="tbtn add" data-open="item">+ Item</button>
+    <button class="tbtn" data-edit="item">Edit Item</button>
+    <button class="tbtn add" data-open="custom">+ Custom Resource</button>
+  </div>
+
+  <div id="palette"></div>
+
+  <div id="editorPane">
+    <div id="editorHeader"><span>Script</span><button id="runBtn">&#9654; Run</button></div>
+    <textarea id="codeInput" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    <div id="status"></div>
+  </div>
+
+</div>
+
+<div id="modalBg">
+  <div id="modal">
+    <h3 id="modalTitle">New Block</h3>
+    <div id="existingList"></div>
+    <div id="formFields"></div>
+    <div class="modalBtns">
+      <button id="cancelBtn" type="button">Cancel</button>
+      <button id="deleteBtn" type="button" style="display:none;">Delete</button>
+      <button id="saveBtn" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- Resource store (the "palette" - persists across script runs) ----------------
+  var resources = { block:{}, character:{}, npc:{}, mob:{}, item:{}, custom:{} };
+
+  var TYPE_META = {
+    block:     { label:"Block",     icon:"\u25A6" },
+    character: { label:"Character", icon:"\u263A" },
+    npc:       { label:"NPC",       icon:"\u25D4" },
+    mob:       { label:"Mob",       icon:"\u2726" },
+    item:      { label:"Item",      icon:"\u25C6" },
+    custom:    { label:"Custom",    icon:"\u25C8" }
+  };
+
+  // Seed a couple of starter resources so the world isn't empty on first load.
+  resources.block.Grass = { name:"Grass", color:"#3d8b45" };
+  resources.block.Tree  = { name:"Tree",  color:"#245c34" };
+  resources.character.Hero = { name:"Hero", color:"#ffd76a", health:100, speed:3 };
+
+  // ---------------- Grid / canvas ----------------
+  var COLS = 9, ROWS = 6, CELL = 40;
+  var canvas = document.getElementById('gameCanvas');
+  canvas.width = COLS*CELL; canvas.height = ROWS*CELL;
+  var ctx = canvas.getContext('2d');
+  document.getElementById('gridInfo').textContent = COLS + '\u00D7' + ROWS + ' grid';
+
+  function emptyScene(){
+    var grid = [];
+    for (var r=0;r<ROWS;r++){ grid.push(new Array(COLS).fill(null)); }
+    return { grid: grid, entities: [] };
+  }
+  var scene = emptyScene();
+
+  function render(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = "#241d3f";
+    for(var x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
+    for(var y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(COLS*CELL,y*CELL); ctx.stroke(); }
+
+    for(var r=0;r<ROWS;r++){
+      for(var c=0;c<COLS;c++){
+        var name = scene.grid[r][c];
+        if(!name) continue;
+        var def = resources.block[name];
+        ctx.fillStyle = def ? def.color : "#555";
+        ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+      }
+    }
+
+    scene.entities.forEach(function(e){
+      var px = e.x*CELL + CELL/2, py = e.y*CELL + CELL/2;
+      ctx.beginPath();
+      ctx.arc(px,py,CELL*0.32,0,Math.PI*2);
+      ctx.fillStyle = e.color;
+      ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle="rgba(13,11,24,.5)"; ctx.stroke();
+      ctx.fillStyle="#0d0b18"; ctx.font="11px sans-serif"; ctx.textAlign="center";
+      ctx.fillText(TYPE_META[e.kind].icon, px, py+4);
+    });
+  }
+
+  // ---------------- Scripting engine API (what the user's code talks to) ----------------
+  function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+  function makeEngine(){
+    function addEntity(kind,name,x,y){
+      var def = resources[kind][name];
+      if(!def) throw new Error('add'+cap(kind)+': no ' + kind + ' resource named "'+name+'" - create one with the + ' + cap(kind) + ' button');
+      var entity = { kind:kind, name:name, x:x, y:y, color:def.color };
+      for (var k in def) if (entity[k] === undefined) entity[k] = def[k];
+      scene.entities.push(entity);
+    }
+    return {
+      setBlock: function(x,y,name){
+        if(y<0||y>=ROWS||x<0||x>=COLS) throw new Error('setBlock: ('+x+','+y+') is outside the '+COLS+'x'+ROWS+' grid');
+        if(!resources.block[name]) throw new Error('setBlock: no block resource named "'+name+'" - create one with + Block');
+        scene.grid[y][x] = name;
+      },
+      clearBlock: function(x,y){ if(scene.grid[y]) scene.grid[y][x]=null; },
+      addCharacter: function(name,x,y){ addEntity('character',name,x,y); },
+      addNPC: function(name,x,y){ addEntity('npc',name,x,y); },
+      addMob: function(name,x,y){ addEntity('mob',name,x,y); },
+      addItem: function(name,x,y){ addEntity('item',name,x,y); },
+      addCustom: function(name,x,y){ addEntity('custom',name,x,y); },
+      clearAll: function(){ scene = emptyScene(); },
+      log: function(){ logLines.push(Array.prototype.slice.call(arguments).map(String).join(' ')); }
+    };
+  }
+
+  // ---------------- Run / live preview ----------------
+  var codeInput = document.getElementById('codeInput');
+  var statusEl = document.getElementById('status');
+  var logLines = [];
+
+  codeInput.value =
+"// Try me! Create a \"Tree\" block below with + Block,\n" +
+"// then place it like this:\n" +
+"engine.setBlock(2, 2, \"Tree\");\n" +
+"engine.setBlock(3, 2, \"Tree\");\n" +
+"engine.addCharacter(\"Hero\", 4, 4);\n";
+
+  function runCode(){
+    logLines = [];
+    scene = emptyScene();
+    var engine = makeEngine();
+    try{
+      var fn = new Function('engine', codeInput.value);
+      fn(engine);
+      render();
+      statusEl.className = '';
+      statusEl.textContent = logLines.length ? logLines.join(' | ') : 'Ran successfully';
+    }catch(err){
+      render();
+      statusEl.className = 'err';
+      statusEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  var debounceTimer = null;
+  codeInput.addEventListener('input', function(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runCode, 500);
+  });
+  codeInput.addEventListener('keydown', function(e){
+    if(e.key === 'Tab'){
+      e.preventDefault();
+      var s=codeInput.selectionStart, en=codeInput.selectionEnd;
+      codeInput.value = codeInput.value.slice(0,s)+'  '+codeInput.value.slice(en);
+      codeInput.selectionStart = codeInput.selectionEnd = s+2;
+    }
+  });
+  document.getElementById('runBtn').addEventListener('click', runCode);
+
+  // ---------------- Resource palette (tap a chip to insert a snippet) ----------------
+  function refreshPalette(){
+    var el = document.getElementById('palette');
+    el.innerHTML='';
+    Object.keys(resources).forEach(function(type){
+      Object.keys(resources[type]).forEach(function(nm){
+        var def = resources[type][nm];
+        var chip=document.createElement('button');
+        chip.className='chip';
+        chip.type = 'button';
+        chip.innerHTML = '<span class="sw" style="background:'+def.color+'"></span>' +
+                          '<span class="nm">'+escapeHtml(def.name)+'</span>' +
+                          '<span class="kind">'+TYPE_META[type].icon+'</span>';
+        chip.addEventListener('click',function(){ insertSnippet(type,def.name); });
+        el.appendChild(chip);
+      });
+    });
+  }
+  function insertSnippet(type,name){
+    var call = type==='block' ? 'engine.setBlock(0, 0, "'+name+'");\n'
+                               : 'engine.add'+cap(type)+'("'+name+'", 0, 0);\n';
+    var pos = codeInput.selectionStart;
+    if (typeof pos !== 'number') pos = codeInput.value.length;
+    codeInput.value = codeInput.value.slice(0,pos)+call+codeInput.value.slice(pos);
+    codeInput.focus();
+    codeInput.selectionStart = codeInput.selectionEnd = pos+call.length;
+    runCode();
+  }
+
+  // ---------------- Modal: create / edit resources ----------------
+  var modalBg = document.getElementById('modalBg');
+  var modalTitle = document.getElementById('modalTitle');
+  var formFields = document.getElementById('formFields');
+  var existingList = document.getElementById('existingList');
+  var saveBtn = document.getElementById('saveBtn');
+  var deleteBtn = document.getElementById('deleteBtn');
+  var cancelBtn = document.getElementById('cancelBtn');
+
+  var modalType=null, editingName=null;
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function fieldsFor(type, def){
+    def = def || { name:'', color:'#5ee3b5', health:100, speed:3, dialogue:'', effect:'', props:[] };
+    var html = '' +
+      '<div class="field"><label>Name</label><input type="text" id="f_name" value="'+escapeHtml(def.name)+'" placeholder="e.g. Tree"></div>' +
+      '<div class="field"><label>Colour / Texture</label><input type="color" id="f_color" value="'+def.color+'"></div>';
+    if(type==='character' || type==='mob'){
+      html += '<div class="row2">' +
+        '<div class="field"><label>Health</label><input type="number" id="f_health" value="'+(def.health!=null?def.health:100)+'"></div>' +
+        '<div class="field"><label>Speed</label><input type="number" id="f_speed" value="'+(def.speed!=null?def.speed:3)+'"></div>' +
+      '</div>';
+    }
+    if(type==='npc'){
+      html += '<div class="field"><label>Dialogue</label><textarea id="f_dialogue" rows="2" placeholder="What this NPC says...">'+escapeHtml(def.dialogue||'')+'</textarea></div>';
+    }
+    if(type==='item'){
+      html += '<div class="field"><label>Effect</label><input type="text" id="f_effect" value="'+escapeHtml(def.effect||'')+'" placeholder="e.g. +10 health"></div>';
+    }
+    if(type==='custom'){
+      html += '<div class="field"><label>Custom properties</label><div class="customProps" id="customProps"></div>' +
+        '<button id="addPropBtn" type="button">+ Add property</button></div>';
+    }
+    formFields.innerHTML = html;
+    if(type==='custom'){
+      var wrap = document.getElementById('customProps');
+      var rows = (def.props && def.props.length ? def.props : [{k:'',v:''}]);
+      rows.forEach(function(r){ addPropRow(wrap,r.k,r.v); });
+      document.getElementById('addPropBtn').addEventListener('click',function(){ addPropRow(wrap,'',''); });
+    }
+  }
+  function addPropRow(wrap,k,v){
+    var row=document.createElement('div'); row.className='propRow';
+    row.innerHTML = '<input type="text" class="pk" placeholder="property" value="'+escapeHtml(k)+'">' +
+                     '<input type="text" class="pv" placeholder="value" value="'+escapeHtml(v)+'">';
+    wrap.appendChild(row);
+  }
+
+  function refreshExistingList(type){
+    existingList.innerHTML='';
+    var names = Object.keys(resources[type]);
+    if(!names.length){
+      var hint = document.createElement('span');
+      hint.className='hint';
+      hint.textContent = 'No '+TYPE_META[type].label.toLowerCase()+'s yet - create one below.';
+      existingList.appendChild(hint);
+      return;
+    }
+    names.forEach(function(n){
+      var b=document.createElement('button');
+      b.type='button';
+      b.textContent=n;
+      b.className = n===editingName ? 'active':'';
+      b.addEventListener('click',function(){ editingName=n; openModal(type,n); });
+      existingList.appendChild(b);
+    });
+  }
+
+  function openModal(type, name){
+    modalType = type;
+    editingName = name || null;
+    var def = name ? resources[type][name] : null;
+    modalTitle.textContent = (def ? 'Edit ' : 'New ') + TYPE_META[type].label;
+    fieldsFor(type, def);
+    refreshExistingList(type);
+    deleteBtn.style.display = def ? 'block' : 'none';
+    modalBg.classList.add('open');
+  }
+  function closeModal(){ modalBg.classList.remove('open'); modalType=null; editingName=null; }
+
+  function collectForm(type){
+    var name = document.getElementById('f_name').value.trim();
+    if(!name) throw new Error('Please enter a name.');
+    var def = { name:name, color: document.getElementById('f_color').value };
+    if(type==='character' || type==='mob'){
+      def.health = Number(document.getElementById('f_health').value)||0;
+      def.speed = Number(document.getElementById('f_speed').value)||0;
+    }
+    if(type==='npc'){ def.dialogue = document.getElementById('f_dialogue').value; }
+    if(type==='item'){ def.effect = document.getElementById('f_effect').value; }
+    if(type==='custom'){
+      def.props = Array.prototype.slice.call(document.querySelectorAll('#customProps .propRow')).map(function(r){
+        return { k:r.querySelector('.pk').value.trim(), v:r.querySelector('.pv').value.trim() };
+      }).filter(function(p){ return p.k; });
+    }
+    return def;
+  }
+
+  saveBtn.addEventListener('click', function(){
+    try{
+      var def = collectForm(modalType);
+      if(editingName && editingName!==def.name) delete resources[modalType][editingName];
+      resources[modalType][def.name] = def;
+      refreshPalette();
+      closeModal();
+      runCode();
+    }catch(err){ alert(err.message); }
+  });
+  deleteBtn.addEventListener('click', function(){
+    if(editingName){ delete resources[modalType][editingName]; refreshPalette(); }
+    closeModal();
+    runCode();
+  });
+  cancelBtn.addEventListener('click', closeModal);
+  modalBg.addEventListener('click', function(e){ if(e.target===modalBg) closeModal(); });
+
+  Array.prototype.slice.call(document.querySelectorAll('[data-open]')).forEach(function(btn){
+    btn.addEventListener('click',function(){ openModal(btn.getAttribute('data-open'), null); });
+  });
+  Array.prototype.slice.call(document.querySelectorAll('[data-edit]')).forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var type = btn.getAttribute('data-edit');
+      var first = Object.keys(resources[type])[0] || null;
+      openModal(type, first);
+    });
+  });
+
+  // ---------------- init ----------------
+  refreshPalette();
+  runCode();
+})();
+</script>
+</body>
+</html>

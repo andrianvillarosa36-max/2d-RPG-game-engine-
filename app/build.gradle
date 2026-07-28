@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.example.miniengine2d'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.example.miniengine2d"
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+// Deliberately zero external dependencies: the whole engine is plain HTML/
+// CSS/JS running inside the platform WebView, so there is nothing here to
+// resolve or go out of date. Add AndroidX/Material libraries later only if
+// you build native (non-WebView) screens.

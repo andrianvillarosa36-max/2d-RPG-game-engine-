@@ -1,0 +1,15 @@
+// Top-level build file. Individual module build files (app/build.gradle)
+// apply the plugins declared here.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+plugins {
+    // Pinned to a mature, well-documented AGP/Kotlin pairing on purpose -
+    // see README.md "Why these versions" before bumping them.
+    id 'com.android.application' version '8.7.0' apply false
+    id 'org.jetbrains.kotlin.android' version '2.0.21' apply false
+}
