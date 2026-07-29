@@ -26,15 +26,23 @@
   #previewPane{ flex:0 0 44%; background:var(--dusk); display:flex; flex-direction:column; border-bottom:1px solid var(--rune); min-height:0; }
   #previewHeader{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px;
     font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--mist-dim);
-    border-bottom:1px solid var(--rune); flex:0 0 auto; }
-  #previewHeader .live{ display:inline-flex; align-items:center; gap:6px; }
+    border-bottom:1px solid var(--rune); flex:0 0 auto; gap:8px; }
+  #previewHeader .live{ display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; }
   #previewHeader .dot{ width:7px;height:7px;border-radius:50%; background:var(--gold); display:inline-block;
     animation: pulse 2s ease-in-out infinite; }
+  #hudInfo{ flex:1; text-align:center; }
   @media (prefers-reduced-motion: reduce){ #previewHeader .dot{ animation:none; } }
   @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
-  #canvasWrap{ flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:14px; min-height:0; }
+  #canvasWrap{ flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:14px; min-height:0; position:relative; }
   #gameCanvas{ background:var(--ink); border-radius:3px; max-width:100%; max-height:100%;
     box-shadow: 0 0 0 2px var(--dusk-2), 0 0 0 4px var(--gold); touch-action:none; }
+
+  /* ---------- Joystick overlay ---------- */
+  #padWrap{ position:absolute; left:14px; bottom:14px; z-index:5; user-select:none; -webkit-user-select:none; }
+  #joyBase{ width:84px; height:84px; border-radius:50%; background:rgba(36,29,63,.6);
+    border:2px solid var(--rune); position:relative; touch-action:none; }
+  #joyNub{ width:36px; height:36px; border-radius:50%; background:var(--gold); position:absolute;
+    left:24px; top:24px; box-shadow:0 2px 6px rgba(0,0,0,.45); pointer-events:none; }
 
   /* ---------- Resource toolbar ---------- */
   #toolbar{ flex:0 0 auto; background:var(--dusk-2); border-bottom:1px solid var(--rune);
@@ -59,9 +67,12 @@
   #editorHeader{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px;
     font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--mist-dim);
     border-bottom:1px solid var(--rune); flex:0 0 auto; }
+  #editorHeader .btns{ display:flex; gap:6px; }
   #runBtn{ background:var(--gold); color:var(--ink); border:none; border-radius:4px; padding:6px 14px;
     font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.04em; }
-  #runBtn:active{ transform:translateY(1px); }
+  #resetBtn{ background:transparent; color:var(--mist-dim); border:1px solid var(--rune); border-radius:4px;
+    padding:6px 10px; font-family:var(--mono); font-size:11px; }
+  #runBtn:active, #resetBtn:active{ transform:translateY(1px); }
   #codeInput{ flex:1; width:100%; resize:none; border:none; outline:none; background:var(--ink); color:#d8ffe4;
     font-family:var(--mono); font-size:13px; line-height:1.55; padding:12px; tab-size:2; border-top:2px solid transparent; }
   #codeInput:focus{ border-top-color:var(--gold); }
@@ -84,10 +95,13 @@
   .field input[type=color]{ width:100%; height:38px; border:1px solid var(--rune); border-radius:6px; background:var(--ink); padding:3px; }
   .row2{ display:flex; gap:8px; }
   .row2 > .field{ flex:1; }
+  .checkField{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .checkField input{ width:18px; height:18px; flex:0 0 auto; }
+  .checkField label{ margin:0; text-transform:none; letter-spacing:0; font-family:var(--sans); font-size:13px; color:var(--mist); }
   .modalBtns{ display:flex; gap:8px; margin-top:6px; }
   .modalBtns button{ flex:1; padding:11px; border-radius:6px; border:1px solid var(--rune);
     font-family:var(--mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; }
-  #saveBtn{ background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:700; }
+  #saveBtn, #ioActionBtn{ background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:700; }
   #cancelBtn{ background:transparent; color:var(--mist-dim); }
   #deleteBtn{ background:transparent; color:var(--ember); border-color:rgba(255,107,107,.35); }
   #existingList{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
@@ -100,18 +114,35 @@
   #addPropBtn{ background:transparent; border:1px dashed var(--rune); color:var(--mist-dim); border-radius:6px;
     padding:8px; width:100%; font-family:var(--mono); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
 
-  /* Accessibility: visible focus ring everywhere except the code editor (handled above) */
   button:focus-visible, input:focus-visible, select:focus-visible{
     outline:2px solid var(--gold); outline-offset:2px;
   }
+
+  /* ---------- Export / Import (project save-load, text based) ---------- */
+  .tbtn.io{ border-color:var(--mist-dim); color:var(--mist-dim); }
+  #ioModalBg{ position:fixed; inset:0; background:rgba(6,5,12,.65); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  #ioModalBg.open{ display:flex; }
+  #ioModal{ background:var(--dusk); width:100%; max-width:480px; border-radius:10px 10px 0 0; padding:16px;
+    max-height:82vh; overflow-y:auto; box-shadow:0 0 0 2px var(--gold) inset; }
+  #ioModal h3{ margin:0 0 8px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); }
+  #ioModal p{ margin:0 0 10px; font-size:12px; color:var(--mist-dim); line-height:1.4; }
+  #ioTextarea{ width:100%; min-height:180px; background:var(--ink); border:1px solid var(--rune); border-radius:6px;
+    padding:10px; color:var(--mist); font-family:var(--mono); font-size:12px; resize:vertical; }
 </style>
 </head>
 <body>
 <div id="app">
 
   <div id="previewPane">
-    <div id="previewHeader"><span class="live"><span class="dot"></span>Live Preview</span><span id="gridInfo"></span></div>
-    <div id="canvasWrap"><canvas id="gameCanvas"></canvas></div>
+    <div id="previewHeader">
+      <span class="live"><span class="dot"></span>Live Preview</span>
+      <span id="hudInfo"></span>
+      <span id="gridInfo"></span>
+    </div>
+    <div id="canvasWrap">
+      <canvas id="gameCanvas"></canvas>
+      <div id="padWrap"><div id="joyBase"><div id="joyNub"></div></div></div>
+    </div>
   </div>
 
   <div id="toolbar">
@@ -126,12 +157,20 @@
     <button class="tbtn add" data-open="item">+ Item</button>
     <button class="tbtn" data-edit="item">Edit Item</button>
     <button class="tbtn add" data-open="custom">+ Custom Resource</button>
+    <button class="tbtn io" id="exportBtn" type="button">Export</button>
+    <button class="tbtn io" id="importBtn" type="button">Import</button>
   </div>
 
   <div id="palette"></div>
 
   <div id="editorPane">
-    <div id="editorHeader"><span>Script</span><button id="runBtn">&#9654; Run</button></div>
+    <div id="editorHeader">
+      <span>Script</span>
+      <span class="btns">
+        <button id="resetBtn" type="button" title="Reset play state">&#8635; Reset</button>
+        <button id="runBtn" type="button">&#9654; Run</button>
+      </span>
+    </div>
     <textarea id="codeInput" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
     <div id="status"></div>
   </div>
@@ -151,9 +190,24 @@
   </div>
 </div>
 
+<div id="ioModalBg">
+  <div id="ioModal">
+    <h3 id="ioModalTitle">Export Project</h3>
+    <p id="ioModalHint"></p>
+    <textarea id="ioTextarea" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+    <div class="modalBtns">
+      <button id="ioCancelBtn" type="button">Close</button>
+      <button id="ioActionBtn" type="button">Copy</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
+
+  var HERO_ATTACK_DAMAGE = 25;
+  var MOB_ATTACK_DAMAGE = 10;
 
   // ---------------- Resource store (the "palette" - persists across script runs) ----------------
   var resources = { block:{}, character:{}, npc:{}, mob:{}, item:{}, custom:{} };
@@ -167,10 +221,45 @@
     custom:    { label:"Custom",    icon:"\u25C8" }
   };
 
-  // Seed a couple of starter resources so the world isn't empty on first load.
-  resources.block.Grass = { name:"Grass", color:"#3d8b45" };
-  resources.block.Tree  = { name:"Tree",  color:"#245c34" };
-  resources.character.Hero = { name:"Hero", color:"#ffd76a", health:100, speed:3 };
+  var DEFAULT_CODE =
+"// Move the Hero with the joystick (bottom-left of the preview)!\n" +
+"// Bump into the Slime to fight it.\n" +
+"engine.setBlock(2, 2, \"Tree\");\n" +
+"engine.setBlock(3, 2, \"Tree\");\n" +
+"engine.addCharacter(\"Hero\", 4, 4);\n" +
+"engine.addMob(\"Slime\", 6, 4);\n";
+
+  // Starter resources + script - only used the very first time there's nothing saved yet.
+  function applyDefaults(){
+    resources.block.Grass = { name:"Grass", color:"#3d8b45", solid:false };
+    resources.block.Tree  = { name:"Tree",  color:"#245c34", solid:true };
+    resources.character.Hero = { name:"Hero", color:"#ffd76a", health:100, speed:3 };
+    resources.mob.Slime = { name:"Slime", color:"#5ee3b5", health:30, speed:2 };
+    codeInput.value = DEFAULT_CODE;
+  }
+
+  // Silent autosave (separate from the manual Export/Import text below): every
+  // successful or failed Run tries to persist to this device automatically,
+  // so closing and reopening the app just works with no extra steps.
+  var STORAGE_KEY = 'miniengine2d.autosave.v1';
+  function saveLocal(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ resources:resources, script:codeInput.value }));
+      return true;
+    }catch(e){ return false; }
+  }
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return false;
+      var data = JSON.parse(raw);
+      if(!data || !data.resources || typeof data.script !== 'string') return false;
+      resources = data.resources;
+      ['block','character','npc','mob','item','custom'].forEach(function(t){ if(!resources[t]) resources[t] = {}; });
+      codeInput.value = data.script;
+      return true;
+    }catch(e){ return false; }
+  }
 
   // ---------------- Grid / canvas ----------------
   var COLS = 9, ROWS = 6, CELL = 40;
@@ -199,6 +288,11 @@
         var def = resources.block[name];
         ctx.fillStyle = def ? def.color : "#555";
         ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+        if (def && def.solid) {
+          ctx.strokeStyle = 'rgba(13,11,24,.55)';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(c*CELL+3, r*CELL+3, CELL-6, CELL-6);
+        }
       }
     }
 
@@ -214,6 +308,20 @@
     });
   }
 
+  function setStatus(text, isError){
+    statusEl.className = isError ? 'err' : '';
+    statusEl.textContent = text;
+  }
+
+  function updateHud(){
+    var hero = scene.entities.find(function(e){ return e.kind==='character'; });
+    var hud = document.getElementById('hudInfo');
+    if (!hero || hero.maxHealth == null) { hud.textContent=''; hud.style.color=''; return; }
+    var hp = Math.max(0, hero.health), max = hero.maxHealth;
+    hud.textContent = 'HP ' + hp + '/' + max;
+    hud.style.color = (hp <= max*0.3) ? 'var(--ember)' : '';
+  }
+
   // ---------------- Scripting engine API (what the user's code talks to) ----------------
   function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
@@ -223,6 +331,7 @@
       if(!def) throw new Error('add'+cap(kind)+': no ' + kind + ' resource named "'+name+'" - create one with the + ' + cap(kind) + ' button');
       var entity = { kind:kind, name:name, x:x, y:y, color:def.color };
       for (var k in def) if (entity[k] === undefined) entity[k] = def[k];
+      if (entity.health != null) entity.maxHealth = entity.health;
       scene.entities.push(entity);
     }
     return {
@@ -247,13 +356,6 @@
   var statusEl = document.getElementById('status');
   var logLines = [];
 
-  codeInput.value =
-"// Try me! Create a \"Tree\" block below with + Block,\n" +
-"// then place it like this:\n" +
-"engine.setBlock(2, 2, \"Tree\");\n" +
-"engine.setBlock(3, 2, \"Tree\");\n" +
-"engine.addCharacter(\"Hero\", 4, 4);\n";
-
   function runCode(){
     logLines = [];
     scene = emptyScene();
@@ -262,12 +364,14 @@
       var fn = new Function('engine', codeInput.value);
       fn(engine);
       render();
-      statusEl.className = '';
-      statusEl.textContent = logLines.length ? logLines.join(' | ') : 'Ran successfully';
+      updateHud();
+      var saved = saveLocal();
+      setStatus((logLines.length ? logLines.join(' | ') : 'Ran successfully') + (saved ? ' \u00B7 saved' : ''), false);
     }catch(err){
       render();
-      statusEl.className = 'err';
-      statusEl.textContent = 'Error: ' + err.message;
+      updateHud();
+      setStatus('Error: ' + err.message, true);
+      saveLocal();
     }
   }
 
@@ -285,6 +389,105 @@
     }
   });
   document.getElementById('runBtn').addEventListener('click', runCode);
+  document.getElementById('resetBtn').addEventListener('click', runCode);
+
+  // ---------------- Movement / collision / combat ----------------
+  function attemptMove(dx,dy){
+    var hero = scene.entities.find(function(e){ return e.kind==='character'; });
+    if(!hero){ setStatus('Add a Character and place it with addCharacter(...) to move.', false); return; }
+    if(hero.health <= 0){ setStatus('Hero was defeated! Tap Reset to try again.', true); return; }
+
+    var nx = hero.x+dx, ny = hero.y+dy;
+    if(nx<0||nx>=COLS||ny<0||ny>=ROWS) return;
+
+    var mob = scene.entities.find(function(e){ return e.kind==='mob' && e.x===nx && e.y===ny; });
+    if(mob){
+      mob.health -= HERO_ATTACK_DAMAGE;
+      hero.health -= MOB_ATTACK_DAMAGE;
+      if(mob.health <= 0){
+        scene.entities = scene.entities.filter(function(e){ return e!==mob; });
+        setStatus(mob.name+' defeated!', false);
+      }else{
+        setStatus('Hit '+mob.name+'! ('+Math.max(0,mob.health)+' HP left)', false);
+      }
+      if(hero.health <= 0) setStatus('Hero was defeated! Tap Reset to try again.', true);
+      render(); updateHud();
+      return;
+    }
+
+    var npc = scene.entities.find(function(e){ return e.kind==='npc' && e.x===nx && e.y===ny; });
+    if(npc){ setStatus(npc.name+': "'+(npc.dialogue||'...')+'"', false); return; }
+
+    var blockName = scene.grid[ny] ? scene.grid[ny][nx] : null;
+    var blockDef = blockName ? resources.block[blockName] : null;
+    if(blockDef && blockDef.solid){ setStatus(blockName+' is in the way.', false); return; }
+
+    var item = scene.entities.find(function(e){ return e.kind==='item' && e.x===nx && e.y===ny; });
+    if(item){
+      scene.entities = scene.entities.filter(function(e){ return e!==item; });
+      setStatus('Picked up '+item.name+(item.effect?' ('+item.effect+')':'')+'!', false);
+    }
+
+    hero.x = nx; hero.y = ny;
+    render(); updateHud();
+  }
+
+  // ---------------- Joystick control ----------------
+  (function setupJoystick(){
+    var base = document.getElementById('joyBase');
+    var nub = document.getElementById('joyNub');
+    var baseRadius = 42, halfNub = 18, maxDist = 22, deadZone = 12;
+    var active = false, repeatTimer = null, currentDir = null;
+    var DIR_DELTA = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
+
+    function centerNub(){ nub.style.left=(baseRadius-halfNub)+'px'; nub.style.top=(baseRadius-halfNub)+'px'; }
+    centerNub();
+
+    function stepInterval(){
+      var hero = scene.entities.find(function(e){ return e.kind==='character'; });
+      var speed = (hero && hero.speed) ? hero.speed : 3;
+      return Math.max(120, 500 - speed*40);
+    }
+    function startRepeat(dir){
+      if(currentDir === dir) return;
+      currentDir = dir;
+      clearInterval(repeatTimer);
+      var d = DIR_DELTA[dir];
+      attemptMove(d[0], d[1]);
+      repeatTimer = setInterval(function(){ attemptMove(d[0], d[1]); }, stepInterval());
+    }
+    function stopRepeat(){ currentDir = null; clearInterval(repeatTimer); repeatTimer = null; }
+
+    function handleMove(clientX, clientY){
+      var rect = base.getBoundingClientRect();
+      var cx = rect.left+rect.width/2, cy = rect.top+rect.height/2;
+      var dx = clientX-cx, dy = clientY-cy;
+      var dist = Math.min(Math.hypot(dx,dy), maxDist);
+      var ang = Math.atan2(dy,dx);
+      nub.style.left = (baseRadius-halfNub+Math.cos(ang)*dist)+'px';
+      nub.style.top  = (baseRadius-halfNub+Math.sin(ang)*dist)+'px';
+      if(Math.abs(dx) < deadZone && Math.abs(dy) < deadZone){ stopRepeat(); return; }
+      var dir = Math.abs(dx) > Math.abs(dy) ? (dx>0?'right':'left') : (dy>0?'down':'up');
+      startRepeat(dir);
+    }
+    function endDrag(){ active=false; centerNub(); stopRepeat(); }
+
+    base.addEventListener('touchstart', function(e){ active=true; handleMove(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
+    base.addEventListener('touchmove', function(e){ if(!active) return; handleMove(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
+    base.addEventListener('touchend', function(e){ endDrag(); e.preventDefault(); }, {passive:false});
+    base.addEventListener('touchcancel', function(e){ endDrag(); e.preventDefault(); }, {passive:false});
+    base.addEventListener('mousedown', function(e){ active=true; handleMove(e.clientX,e.clientY); });
+    window.addEventListener('mousemove', function(e){ if(!active) return; handleMove(e.clientX,e.clientY); });
+    window.addEventListener('mouseup', function(){ if(active) endDrag(); });
+  })();
+
+  // Keyboard fallback for browser testing (arrow keys / WASD), ignored while typing in the editor.
+  document.addEventListener('keydown', function(e){
+    if(document.activeElement === codeInput) return;
+    var map = { ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0], w:[0,-1], s:[0,1], a:[-1,0], d:[1,0] };
+    var d = map[e.key];
+    if(d){ attemptMove(d[0], d[1]); e.preventDefault(); }
+  });
 
   // ---------------- Resource palette (tap a chip to insert a snippet) ----------------
   function refreshPalette(){
@@ -333,10 +536,14 @@
   }
 
   function fieldsFor(type, def){
-    def = def || { name:'', color:'#5ee3b5', health:100, speed:3, dialogue:'', effect:'', props:[] };
+    def = def || { name:'', color:'#5ee3b5', solid:false, health:100, speed:3, dialogue:'', effect:'', props:[] };
     var html = '' +
       '<div class="field"><label>Name</label><input type="text" id="f_name" value="'+escapeHtml(def.name)+'" placeholder="e.g. Tree"></div>' +
       '<div class="field"><label>Colour / Texture</label><input type="color" id="f_color" value="'+def.color+'"></div>';
+    if(type==='block'){
+      html += '<div class="field checkField"><input type="checkbox" id="f_solid"'+(def.solid?' checked':'')+'>' +
+        '<label for="f_solid">Solid (blocks movement)</label></div>';
+    }
     if(type==='character' || type==='mob'){
       html += '<div class="row2">' +
         '<div class="field"><label>Health</label><input type="number" id="f_health" value="'+(def.health!=null?def.health:100)+'"></div>' +
@@ -404,6 +611,7 @@
     var name = document.getElementById('f_name').value.trim();
     if(!name) throw new Error('Please enter a name.');
     var def = { name:name, color: document.getElementById('f_color').value };
+    if(type==='block'){ def.solid = document.getElementById('f_solid').checked; }
     if(type==='character' || type==='mob'){
       def.health = Number(document.getElementById('f_health').value)||0;
       def.speed = Number(document.getElementById('f_speed').value)||0;
@@ -447,7 +655,86 @@
     });
   });
 
+  // ---------------- Export / Import (project save-load) ----------------
+  // Deliberately text-based (copy out, paste back in) instead of device
+  // storage: it behaves identically here and inside the installed app,
+  // and there's nothing that can silently fail to save.
+  var ioModalBg = document.getElementById('ioModalBg');
+  var ioModalTitle = document.getElementById('ioModalTitle');
+  var ioModalHint = document.getElementById('ioModalHint');
+  var ioTextarea = document.getElementById('ioTextarea');
+  var ioActionBtn = document.getElementById('ioActionBtn');
+  var ioCancelBtn = document.getElementById('ioCancelBtn');
+  var ioMode = null;
+
+  function setIoHint(msg){ ioModalHint.textContent = msg; }
+
+  function openExport(){
+    ioMode = 'export';
+    ioModalTitle.textContent = 'Export Project';
+    setIoHint('Copy this and save it somewhere safe (Notes, a text file, email to yourself). Paste it back in via Import to restore everything.');
+    var data = { version:1, resources:resources, script:codeInput.value };
+    ioTextarea.value = JSON.stringify(data, null, 2);
+    ioTextarea.readOnly = true;
+    ioActionBtn.textContent = 'Copy';
+    ioModalBg.classList.add('open');
+  }
+  function openImport(){
+    ioMode = 'import';
+    ioModalTitle.textContent = 'Import Project';
+    setIoHint('Paste a project you exported earlier, then tap Load. This replaces your current resources and script.');
+    ioTextarea.value = '';
+    ioTextarea.readOnly = false;
+    ioActionBtn.textContent = 'Load';
+    ioModalBg.classList.add('open');
+    ioTextarea.focus();
+  }
+  function closeIoModal(){ ioModalBg.classList.remove('open'); ioMode=null; }
+
+  function tryCopy(text, done){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(fallbackCopy()); });
+    } else {
+      done(fallbackCopy());
+    }
+    function fallbackCopy(){
+      try{
+        ioTextarea.focus();
+        ioTextarea.setSelectionRange(0, ioTextarea.value.length);
+        return document.execCommand('copy');
+      }catch(e){ return false; }
+    }
+  }
+
+  ioActionBtn.addEventListener('click', function(){
+    if(ioMode === 'export'){
+      tryCopy(ioTextarea.value, function(ok){
+        setIoHint(ok ? 'Copied to clipboard!' : 'Could not auto-copy - select the text above and copy it manually.');
+      });
+    } else if(ioMode === 'import'){
+      try{
+        var data = JSON.parse(ioTextarea.value);
+        if(!data || typeof data !== 'object' || !data.resources || typeof data.script !== 'string'){
+          throw new Error('This does not look like a MiniEngine2D export.');
+        }
+        resources = data.resources;
+        ['block','character','npc','mob','item','custom'].forEach(function(t){ if(!resources[t]) resources[t] = {}; });
+        codeInput.value = data.script;
+        refreshPalette();
+        runCode();
+        closeIoModal();
+      }catch(err){
+        setIoHint('Could not load: ' + err.message);
+      }
+    }
+  });
+  ioCancelBtn.addEventListener('click', closeIoModal);
+  ioModalBg.addEventListener('click', function(e){ if(e.target===ioModalBg) closeIoModal(); });
+  document.getElementById('exportBtn').addEventListener('click', openExport);
+  document.getElementById('importBtn').addEventListener('click', openImport);
+
   // ---------------- init ----------------
+  if(!loadLocal()){ applyDefaults(); }
   refreshPalette();
   runCode();
 })();

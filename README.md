@@ -7,18 +7,22 @@ GDevelop but built by you, for your phone.
 ## Try it in 10 seconds
 
 Open `preview.html` (or `app/src/main/assets/index.html` — they're the same
-file) in any browser. No build, no install. You'll see two tree blocks and a
-Hero character already placed, because the script box starts with:
+file) in any browser. No build, no install. You'll see two Tree blocks, a
+Hero, and a Slime already placed, because the script box starts with:
 
 ```js
 engine.setBlock(2, 2, "Tree");
 engine.setBlock(3, 2, "Tree");
 engine.addCharacter("Hero", 4, 4);
+engine.addMob("Slime", 6, 4);
 ```
 
 Edit that code and the canvas above updates about half a second after you
 stop typing. Tap **+ Block**, name something "Rock", pick a colour, save —
 then type `engine.setBlock(5,1,"Rock")` and watch it appear.
+
+Drag the joystick (bottom-left of the preview) to actually walk the Hero
+around and bump into the Slime to fight it.
 
 ## How it's built (and why)
 
@@ -53,6 +57,39 @@ website via a Trusted Web Activity if you ever want that.
 The grid is 9×6 cells, (0,0) at top-left. `name` always refers to a resource
 you created with the `+` buttons — that's the link between the visual side
 and the code side.
+
+## Controls & combat
+
+The joystick (drag) and arrow keys / WASD (keyboard, for browser testing)
+move the **first Character** placed in the scene, one grid cell per step.
+Bumping into something does different things depending on what it is:
+
+| Bump into... | Result |
+|---|---|
+| A **Block** with "Solid" checked in its editor | Blocked — you don't move |
+| A **Mob** | Attack — 25 damage to it, 10 back to you, each bump |
+| An **NPC** | Shows its Dialogue text in the status bar |
+| An **Item** | Picked up and removed from the scene |
+
+Hero HP is shown top-center of the preview. At 0 HP the Hero stops
+responding to input until you tap **⟲ Reset** (or **▶ Run**), which
+re-runs your script from scratch — the same "fresh world every run" model
+the live preview already used, just now doubling as a playtest reset.
+
+## Save / Load
+
+Two layers, on purpose:
+
+- **Autosave** — every time your script runs (typing, saving a resource in
+  an editor, tapping a palette chip), your resources + script save to this
+  device automatically, using `localStorage`. Close the app, reopen it,
+  everything's exactly where you left it. No button to remember.
+- **Export / Import** — for backups and moving to another device. Export
+  turns your project into JSON text in a copyable box; Import pastes it
+  back in. This is the one that matters before you rebuild the APK:
+  autosave lives in the *old* app's storage, and installing a freshly built
+  APK can wipe that, so export first if you want to keep what you built,
+  then import it back once the new build is installed.
 
 ## Project layout
 
@@ -130,29 +167,31 @@ later is a good phase-2 task once the basics are working.
 
 ## Known limitations (v1)
 
-- **Nothing persists.** Resources and the canvas reset on reload. Save/load
-  is the top item in the roadmap below.
 - **Colours only, no image sprites** — every block/character is a flat
   coloured shape.
 - **No syntax highlighting** — the code box is a plain `<textarea>`.
-- **Fixed 9×6 grid**, not resizable from the UI yet.
+- **Fixed 9×6 grid**, not resizable or scrollable from the UI yet.
+- **One controllable Character** — the joystick always moves whichever
+  Character was placed first in the script; multiple Characters don't yet
+  have a way to switch control between them.
+- **Mobs don't move** — they stand still until bumped; no patrol/chase AI.
 - **Not sandboxed.** Your script runs with full JS access (like any code
   editor's live preview, e.g. CodePen). Fine for your own single-player
   tool; don't paste in code you don't trust.
 
 ## Roadmap
 
-1. **Save/load** — `localStorage` inside the WebView (works fine on-device,
-   just don't reuse this exact HTML file as a Claude.ai artifact if you add
-   it, since Claude.ai's artifact preview blocks browser storage).
-2. **Real code editor** — swap the `<textarea>` for CodeMirror (line
+1. **Real code editor** — swap the `<textarea>` for CodeMirror (line
    numbers, syntax highlighting, bracket matching).
-3. **Image sprites** — let `+ Block` / `+ Character` accept an uploaded
+2. **Image sprites** — let `+ Block` / `+ Character` accept an uploaded
    image instead of only a colour.
-4. **Tilemap + collision** — bigger, scrollable maps and basic AABB
-   collision so characters can't walk through blocks.
-5. **Animation & simple AI** — walk cycles, and patrol/chase behaviour for
-   mobs.
+3. **Bigger, scrollable maps** — beyond the fixed 9×6 grid, with a camera
+   that follows the Hero.
+4. **Animation & simple AI** — walk cycles, and patrol/chase behaviour for
+   mobs instead of standing still.
+5. **Named, multi-project saves** — right now there's one autosave slot;
+   a proper "Save As" using Android's file picker
+   (`Intent.ACTION_CREATE_DOCUMENT`) would allow several named projects.
 6. **Export finished games separately** — MiniEngine2D packages *your* game
    as its own APK, GDevelop-style. This is the long-term goal and a
    substantial project on its own — worth tackling once 1–5 feel solid.
