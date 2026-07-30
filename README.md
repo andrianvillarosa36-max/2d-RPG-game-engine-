@@ -127,9 +127,11 @@ tabs keeps whatever you painted on the one you're leaving, and **Done**
 writes *all* of them into your script at once, each in its own
 `// --- terrain:<name>:start ---` / `:end` block.
 
-**Connecting them** happens through blocks, not the painter itself: open
-**Edit Block** on whichever block should act as the road/door (or make a
-new one just for this), check **"Leads to another terrain"**, and pick the
+**Connecting them** happens through blocks, not the painter itself: a dark
+brown **Road** block is now created for you automatically (once, the first
+time you load this update — it won't come back if you delete it on
+purpose), already non-solid and ready to paint with. Open **Edit Block** on
+it (or any block), check **"Leads to another terrain"**, and pick the
 target terrain + the (x,y) the Hero should land on there. Walk onto that
 block in play mode and you're switched straight into the other terrain,
 Hero HP and all — nothing resets. Set this up in both directions if you
