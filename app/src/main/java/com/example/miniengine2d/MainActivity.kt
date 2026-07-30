@@ -1,7 +1,9 @@
 package com.example.miniengine2d
 
 import android.app.Activity
+import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -12,14 +14,29 @@ import android.webkit.WebViewClient
  * app/src/main/assets/index.html - the exact same file you can test in a
  * desktop browser before ever touching Android Studio or Gradle.
  *
- * Keeping this class tiny means there is very little native surface area
- * that can break. Native features (save/load to device storage, share
- * sheet, file picker for sprite images, etc.) get added here later via
- * webView.addJavascriptInterface(...) - see README.md "Roadmap".
+ * The one bit of native surface area is [OrientationBridge] below: the web
+ * Screen Orientation API is unreliable inside a plain WebView (it mostly
+ * expects the page to be in true browser fullscreen first), so play mode's
+ * landscape lock is done the reliable way, through the Activity itself.
+ * The JS side calls window.Android.lockLandscape() / unlockOrientation()
+ * and falls back to the web API if this bridge isn't present (e.g. when
+ * testing preview.html in a desktop browser).
  */
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+
+    inner class OrientationBridge {
+        @JavascriptInterface
+        fun lockLandscape() {
+            runOnUiThread { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE }
+        }
+
+        @JavascriptInterface
+        fun unlockOrientation() {
+            runOnUiThread { requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +49,7 @@ class MainActivity : Activity() {
         settings.domStorageEnabled = true
         settings.allowFileAccess = true
 
+        webView.addJavascriptInterface(OrientationBridge(), "Android")
         webView.webViewClient = WebViewClient()
         webView.loadUrl("file:///android_asset/index.html")
     }

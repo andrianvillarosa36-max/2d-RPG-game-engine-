@@ -62,19 +62,37 @@ and the code side.
 
 The joystick (drag) and arrow keys / WASD (keyboard, for browser testing)
 move the **first Character** placed in the scene, one grid cell per step.
-Bumping into something does different things depending on what it is:
+
+Two ways to fight or talk:
+- **Bump into it** — walking into a Mob attacks it immediately; walking
+  into an NPC shows its dialogue. No extra step.
+- **The Attack / Talk button** (bottom-right of the preview) — appears
+  whenever the Hero is standing *next to* a Mob or NPC, even approached
+  from the side. Same button, it relabels itself: red "⚔ Attack" next to
+  a Mob, gold "💬 Talk" next to an NPC.
 
 | Bump into... | Result |
 |---|---|
 | A **Block** with "Solid" checked in its editor | Blocked — you don't move |
-| A **Mob** | Attack — 25 damage to it, 10 back to you, each bump |
+| A **Mob** | Attack — 25 damage to it, 10 back to you, each hit |
 | An **NPC** | Shows its Dialogue text in the status bar |
 | An **Item** | Picked up and removed from the scene |
 
 Hero HP is shown top-center of the preview. At 0 HP the Hero stops
-responding to input until you tap **⟲ Reset** (or **▶ Run**), which
-re-runs your script from scratch — the same "fresh world every run" model
-the live preview already used, just now doubling as a playtest reset.
+responding to input until you tap **⟲ Reset**, which re-runs your script
+from scratch.
+
+### Play mode
+
+Tap **▶ Run** and the preview takes over the whole screen and locks to
+landscape — an actual play-test view instead of the cramped top-half
+editor preview. Tap the **✕** top-right to come back to the editor.
+
+Landscape lock goes through a tiny native bridge (`MainActivity.kt` exposes
+`window.Android.lockLandscape()`), because the web-only Screen Orientation
+API is unreliable inside a plain WebView. That means it's solid in the
+installed app; testing `preview.html` in a desktop browser just shows the
+fullscreen layout without rotating anything (nothing to rotate).
 
 ## Save / Load
 
@@ -91,6 +109,38 @@ Two layers, on purpose:
   APK can wipe that, so export first if you want to keep what you built,
   then import it back once the new build is installed.
 
+## Terrain painter
+
+Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
+fast. **+ Terrain** (and **Edit Terrain** — same tool, either button opens
+it) gives you a paint-by-tapping grid instead: pick a block along the top,
+tap or drag across the grid to fill it in, tap **✕** to erase. **Done**
+writes the result into your script as `setBlock` calls between
+`// --- terrain:start ---` / `// --- terrain:end ---` markers — reopening
+the painter later edits that same block in place instead of piling up
+duplicates.
+
+The script stays the source of truth; the painter is just a faster way to
+write part of it. Hand-editing inside (or outside) those markers works
+exactly like any other code.
+
+## Sprite images
+
+Every resource type except Block can carry an uploaded image instead of a
+flat colour circle — open **Edit Character** (or NPC/Mob/Item/Custom) →
+"Sprite image" → pick a photo/PNG from your phone. It's stored as the
+image data itself inside the resource, so it travels with autosave and
+Export/Import automatically — no separate asset files to manage.
+
+**Characters** additionally get **Sprite columns / rows**: if your image
+is a sheet of several poses, say how many frames across and down, and the
+Hero steps through them in order, one frame per grid move, for a simple
+walk animation. It cycles frame 0 → 1 → 2 → ... in reading order. If your
+sheet is actually laid out as *facing directions* (down/up/left/right)
+rather than a walk cycle, tell me the layout in chat and I'll change the
+logic to pick a row by direction instead of just cycling — I didn't want
+to guess wrong from the image alone and lock in the wrong behaviour.
+
 ## Project layout
 
 ```
@@ -100,7 +150,7 @@ MiniEngine2D/
 │   ├── build.gradle              ← app module config
 │   └── src/main/
 │       ├── AndroidManifest.xml
-│       ├── java/.../MainActivity.kt   ← WebView shell (the only native code)
+│       ├── java/.../MainActivity.kt   ← WebView shell + orientation bridge
 │       └── assets/index.html     ← same engine, bundled into the APK
 ├── build.gradle                  ← root: plugin versions
 ├── settings.gradle
@@ -167,13 +217,14 @@ later is a good phase-2 task once the basics are working.
 
 ## Known limitations (v1)
 
-- **Colours only, no image sprites** — every block/character is a flat
-  coloured shape.
+- **Blocks are still colour-only** — sprite images work for Character/NPC/
+  Mob/Item/Custom, but terrain blocks are flat coloured squares for now.
+- **Sprite animation is a simple frame-cycle**, not direction-aware — see
+  "Sprite images" above.
 - **No syntax highlighting** — the code box is a plain `<textarea>`.
 - **Fixed 9×6 grid**, not resizable or scrollable from the UI yet.
-- **One controllable Character** — the joystick always moves whichever
-  Character was placed first in the script; multiple Characters don't yet
-  have a way to switch control between them.
+- **One controllable Character** — the joystick/action button always
+  target whichever Character was placed first in the script.
 - **Mobs don't move** — they stand still until bumped; no patrol/chase AI.
 - **Not sandboxed.** Your script runs with full JS access (like any code
   editor's live preview, e.g. CodePen). Fine for your own single-player
@@ -183,15 +234,14 @@ later is a good phase-2 task once the basics are working.
 
 1. **Real code editor** — swap the `<textarea>` for CodeMirror (line
    numbers, syntax highlighting, bracket matching).
-2. **Image sprites** — let `+ Block` / `+ Character` accept an uploaded
-   image instead of only a colour.
+2. **Block textures** — image support for terrain blocks, not just entities.
 3. **Bigger, scrollable maps** — beyond the fixed 9×6 grid, with a camera
    that follows the Hero.
-4. **Animation & simple AI** — walk cycles, and patrol/chase behaviour for
-   mobs instead of standing still.
+4. **Mob AI** — patrol/chase behaviour instead of standing still. Would
+   want its own sprite animation too, once mobs actually move.
 5. **Named, multi-project saves** — right now there's one autosave slot;
    a proper "Save As" using Android's file picker
    (`Intent.ACTION_CREATE_DOCUMENT`) would allow several named projects.
 6. **Export finished games separately** — MiniEngine2D packages *your* game
    as its own APK, GDevelop-style. This is the long-term goal and a
-   substantial project on its own — worth tackling once 1–5 feel solid.
+   substantial project on its own — worth tackling once the basics feel solid.
