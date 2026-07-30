@@ -157,6 +157,11 @@
   #terrainModal h3{ margin:0 0 6px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); }
   #terrainModal p{ margin:0 0 10px; font-size:12px; color:var(--mist-dim); line-height:1.4; }
   #terrainPalette{ display:flex; gap:6px; overflow-x:auto; padding-bottom:10px; -webkit-overflow-scrolling:touch; }
+  #terrainTabs{ display:flex; gap:6px; overflow-x:auto; padding-bottom:12px; -webkit-overflow-scrolling:touch; }
+  .terrainTab{ flex:0 0 auto; padding:7px 13px; border-radius:14px; border:1px solid var(--rune);
+    background:var(--dusk-2); color:var(--mist-dim); font-family:var(--mono); font-size:11px; white-space:nowrap; }
+  .terrainTab.active{ border-color:var(--gold); color:var(--gold); }
+  .terrainTab.addNew{ color:var(--gold); border-style:dashed; }
   .terrainSwatch{ flex:0 0 auto; width:42px; height:42px; border-radius:6px; border:2px solid var(--rune);
     display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--mist); }
   .terrainSwatch.selected{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
@@ -252,7 +257,8 @@
 <div id="terrainModalBg">
   <div id="terrainModal">
     <h3>Paint Terrain</h3>
-    <p>Pick a block, then tap or drag across the grid to paint. Tap the eraser to clear a cell.</p>
+    <p>Switch or add terrains with the tabs below, pick a block, then tap or drag across the grid to paint. Tap the eraser to clear a cell.</p>
+    <div id="terrainTabs"></div>
     <div id="terrainPalette"></div>
     <div id="terrainGrid"></div>
     <div class="modalBtns">
@@ -323,19 +329,33 @@
 
   // ---------------- Grid / canvas ----------------
   var COLS = 9, ROWS = 6, CELL = 40;
+  var DEFAULT_TERRAIN = 'Terrain 1';
   var canvas = document.getElementById('gameCanvas');
   canvas.width = COLS*CELL; canvas.height = ROWS*CELL;
   var ctx = canvas.getContext('2d');
-  document.getElementById('gridInfo').textContent = COLS + '\u00D7' + ROWS + ' grid';
 
-  function emptyScene(){
+  // A scene is a set of named terrains (each its own COLS x ROWS grid +
+  // entity list) plus which one is currently active. Only the active
+  // terrain is ever rendered/walked around in - moving onto a block with
+  // a "leads to another terrain" link switches which one is active.
+  function emptyGrid(){
     var grid = [];
     for (var r=0;r<ROWS;r++){ grid.push(new Array(COLS).fill(null)); }
-    return { grid: grid, entities: [] };
+    return grid;
+  }
+  function emptyScene(){
+    return { terrains: {}, active: DEFAULT_TERRAIN };
   }
   var scene = emptyScene();
+  function ensureTerrain(name){
+    if(!scene.terrains[name]) scene.terrains[name] = { grid: emptyGrid(), entities: [] };
+    return scene.terrains[name];
+  }
+  function currentTerrain(){ return ensureTerrain(scene.active); }
 
   function render(){
+    document.getElementById('gridInfo').textContent = scene.active + ' \u00B7 ' + COLS + '\u00D7' + ROWS;
+    var t = currentTerrain();
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.strokeStyle = "#241d3f";
     for(var x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
@@ -343,7 +363,7 @@
 
     for(var r=0;r<ROWS;r++){
       for(var c=0;c<COLS;c++){
-        var name = scene.grid[r][c];
+        var name = t.grid[r][c];
         if(!name) continue;
         var def = resources.block[name];
         ctx.fillStyle = def ? def.color : "#555";
@@ -353,10 +373,15 @@
           ctx.lineWidth = 3;
           ctx.strokeRect(c*CELL+3, r*CELL+3, CELL-6, CELL-6);
         }
+        if (def && def.linkTerrain) {
+          ctx.fillStyle = 'rgba(13,11,24,.6)';
+          ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('\u2192', c*CELL+CELL/2, r*CELL+CELL/2+5);
+        }
       }
     }
 
-    scene.entities.forEach(function(e){ drawEntity(e); });
+    t.entities.forEach(function(e){ drawEntity(e); });
   }
 
   var spriteCache = {};
@@ -400,8 +425,10 @@
     statusEl.textContent = text;
   }
 
+  function findHero(){ return currentTerrain().entities.find(function(e){ return e.kind==='character'; }); }
+
   function updateHud(){
-    var hero = scene.entities.find(function(e){ return e.kind==='character'; });
+    var hero = findHero();
     var hud = document.getElementById('hudInfo');
     if (!hero || hero.maxHealth == null) { hud.textContent=''; hud.style.color=''; return; }
     var hp = Math.max(0, hero.health), max = hero.maxHealth;
@@ -413,26 +440,27 @@
   function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
   function makeEngine(){
-    function addEntity(kind,name,x,y){
+    function addEntity(kind,name,x,y,terrain){
       var def = resources[kind][name];
       if(!def) throw new Error('add'+cap(kind)+': no ' + kind + ' resource named "'+name+'" - create one with the + ' + cap(kind) + ' button');
       var entity = { kind:kind, name:name, x:x, y:y, color:def.color, animFrame:0 };
       for (var k in def) if (entity[k] === undefined) entity[k] = def[k];
       if (entity.health != null) entity.maxHealth = entity.health;
-      scene.entities.push(entity);
+      ensureTerrain(terrain||DEFAULT_TERRAIN).entities.push(entity);
     }
     return {
-      setBlock: function(x,y,name){
+      setBlock: function(x,y,name,terrain){
         if(y<0||y>=ROWS||x<0||x>=COLS) throw new Error('setBlock: ('+x+','+y+') is outside the '+COLS+'x'+ROWS+' grid');
         if(!resources.block[name]) throw new Error('setBlock: no block resource named "'+name+'" - create one with + Block');
-        scene.grid[y][x] = name;
+        ensureTerrain(terrain||DEFAULT_TERRAIN).grid[y][x] = name;
       },
-      clearBlock: function(x,y){ if(scene.grid[y]) scene.grid[y][x]=null; },
-      addCharacter: function(name,x,y){ addEntity('character',name,x,y); },
-      addNPC: function(name,x,y){ addEntity('npc',name,x,y); },
-      addMob: function(name,x,y){ addEntity('mob',name,x,y); },
-      addItem: function(name,x,y){ addEntity('item',name,x,y); },
-      addCustom: function(name,x,y){ addEntity('custom',name,x,y); },
+      clearBlock: function(x,y,terrain){ var t=ensureTerrain(terrain||DEFAULT_TERRAIN); if(t.grid[y]) t.grid[y][x]=null; },
+      addCharacter: function(name,x,y,terrain){ addEntity('character',name,x,y,terrain); },
+      addNPC: function(name,x,y,terrain){ addEntity('npc',name,x,y,terrain); },
+      addMob: function(name,x,y,terrain){ addEntity('mob',name,x,y,terrain); },
+      addItem: function(name,x,y,terrain){ addEntity('item',name,x,y,terrain); },
+      addCustom: function(name,x,y,terrain){ addEntity('custom',name,x,y,terrain); },
+      setActiveTerrain: function(name){ ensureTerrain(name); scene.active = name; },
       clearAll: function(){ scene = emptyScene(); },
       log: function(){ logLines.push(Array.prototype.slice.call(arguments).map(String).join(' ')); }
     };
@@ -503,13 +531,12 @@
   document.getElementById('exitPlayBtn').addEventListener('click', exitPlayMode);
 
   // ---------------- Movement / collision / combat ----------------
-  function findHero(){ return scene.entities.find(function(e){ return e.kind==='character'; }); }
-
   function performAttack(hero, mob){
+    var t = currentTerrain();
     mob.health -= HERO_ATTACK_DAMAGE;
     hero.health -= MOB_ATTACK_DAMAGE;
     if(mob.health <= 0){
-      scene.entities = scene.entities.filter(function(e){ return e!==mob; });
+      t.entities = t.entities.filter(function(e){ return e!==mob; });
       setStatus(mob.name+' defeated!', false);
     }else{
       setStatus('Hit '+mob.name+'! ('+Math.max(0,mob.health)+' HP left)', false);
@@ -520,8 +547,20 @@
   function showDialogue(npc){
     setStatus(npc.name+': "'+(npc.dialogue||'...')+'"', false);
   }
+  function useLink(hero, blockDef){
+    var t = currentTerrain();
+    t.entities = t.entities.filter(function(e){ return e!==hero; });
+    scene.active = blockDef.linkTerrain;
+    var dest = ensureTerrain(scene.active);
+    hero.x = blockDef.linkX||0; hero.y = blockDef.linkY||0;
+    dest.entities = dest.entities.filter(function(e){ return e.kind!=='character'; });
+    dest.entities.push(hero);
+    setStatus('Entered ' + scene.active + '.', false);
+    render(); updateHud(); updateActionButton();
+  }
 
   function attemptMove(dx,dy){
+    var t = currentTerrain();
     var hero = findHero();
     if(!hero){ setStatus('Add a Character and place it with addCharacter(...) to move.', false); return; }
     if(hero.health <= 0){ setStatus('Hero was defeated! Tap Reset to try again.', true); return; }
@@ -529,19 +568,20 @@
     var nx = hero.x+dx, ny = hero.y+dy;
     if(nx<0||nx>=COLS||ny<0||ny>=ROWS) return;
 
-    var mob = scene.entities.find(function(e){ return e.kind==='mob' && e.x===nx && e.y===ny; });
+    var mob = t.entities.find(function(e){ return e.kind==='mob' && e.x===nx && e.y===ny; });
     if(mob){ performAttack(hero, mob); return; }
 
-    var npc = scene.entities.find(function(e){ return e.kind==='npc' && e.x===nx && e.y===ny; });
+    var npc = t.entities.find(function(e){ return e.kind==='npc' && e.x===nx && e.y===ny; });
     if(npc){ showDialogue(npc); return; }
 
-    var blockName = scene.grid[ny] ? scene.grid[ny][nx] : null;
+    var blockName = t.grid[ny] ? t.grid[ny][nx] : null;
     var blockDef = blockName ? resources.block[blockName] : null;
+    if(blockDef && blockDef.linkTerrain){ useLink(hero, blockDef); return; }
     if(blockDef && blockDef.solid){ setStatus(blockName+' is in the way.', false); return; }
 
-    var item = scene.entities.find(function(e){ return e.kind==='item' && e.x===nx && e.y===ny; });
+    var item = t.entities.find(function(e){ return e.kind==='item' && e.x===nx && e.y===ny; });
     if(item){
-      scene.entities = scene.entities.filter(function(e){ return e!==item; });
+      t.entities = t.entities.filter(function(e){ return e!==item; });
       setStatus('Picked up '+item.name+(item.effect?' ('+item.effect+')':'')+'!', false);
     }
 
@@ -558,11 +598,12 @@
     var hero = findHero();
     actionTarget = null;
     if(hero && hero.health > 0){
+      var t = currentTerrain();
       var deltas = [[0,-1],[0,1],[-1,0],[1,0]];
       var foundMob = null, foundNpc = null;
       deltas.forEach(function(d){
         var nx = hero.x+d[0], ny = hero.y+d[1];
-        scene.entities.forEach(function(e){
+        t.entities.forEach(function(e){
           if(e.x===nx && e.y===ny){
             if(e.kind==='mob' && !foundMob) foundMob = e;
             if(e.kind==='npc' && !foundNpc) foundNpc = e;
@@ -602,7 +643,7 @@
     centerNub();
 
     function stepInterval(){
-      var hero = scene.entities.find(function(e){ return e.kind==='character'; });
+      var hero = findHero();
       var speed = (hero && hero.speed) ? hero.speed : 3;
       return Math.max(120, 500 - speed*40);
     }
@@ -702,6 +743,22 @@
     if(type==='block'){
       html += '<div class="field checkField"><input type="checkbox" id="f_solid"'+(def.solid?' checked':'')+'>' +
         '<label for="f_solid">Solid (blocks movement)</label></div>';
+      var terrainNames = Object.keys(scene.terrains);
+      html += '<div class="field checkField"><input type="checkbox" id="f_isLink"'+(def.linkTerrain?' checked':'')+'>' +
+        '<label for="f_isLink">Leads to another terrain (road/door)</label></div>';
+      if(terrainNames.length){
+        html += '<div id="linkFields" style="display:'+(def.linkTerrain?'block':'none')+';">' +
+          '<div class="field"><label>Target terrain</label><select id="f_linkTerrain">' +
+            terrainNames.map(function(n){ return '<option value="'+escapeHtml(n)+'"'+(n===def.linkTerrain?' selected':'')+'>'+escapeHtml(n)+'</option>'; }).join('') +
+          '</select></div>' +
+          '<div class="row2">' +
+            '<div class="field"><label>Target X (0-'+(COLS-1)+')</label><input type="number" id="f_linkX" min="0" max="'+(COLS-1)+'" value="'+(def.linkX!=null?def.linkX:0)+'"></div>' +
+            '<div class="field"><label>Target Y (0-'+(ROWS-1)+')</label><input type="number" id="f_linkY" min="0" max="'+(ROWS-1)+'" value="'+(def.linkY!=null?def.linkY:0)+'"></div>' +
+          '</div>' +
+        '</div>';
+      } else {
+        html += '<div id="linkFields" style="display:none;"><p style="font-family:var(--sans);font-size:12px;color:var(--mist-dim);">Create a terrain first (+ Terrain) before linking to one.</p></div>';
+      }
     }
     if(type==='character' || type==='mob'){
       html += '<div class="row2">' +
@@ -740,6 +797,18 @@
       spriteClearBtn.addEventListener('click', function(){
         pendingSpriteClear = true;
         spriteClearBtn.closest('.spritePreview').remove();
+      });
+    }
+    if(type==='block'){
+      var linkCk = document.getElementById('f_isLink');
+      var linkFields = document.getElementById('linkFields');
+      linkCk.addEventListener('change', function(){
+        if(linkCk.checked && !document.getElementById('f_linkTerrain')){
+          alert('Create a terrain first (+ Terrain), then come back and link to it.');
+          linkCk.checked = false;
+          return;
+        }
+        linkFields.style.display = linkCk.checked ? 'block' : 'none';
       });
     }
     if(type==='custom'){
@@ -792,7 +861,18 @@
     var name = document.getElementById('f_name').value.trim();
     if(!name) throw new Error('Please enter a name.');
     var def = { name:name, color: document.getElementById('f_color').value };
-    if(type==='block'){ def.solid = document.getElementById('f_solid').checked; }
+    if(type==='block'){
+      def.solid = document.getElementById('f_solid').checked;
+      var isLink = document.getElementById('f_isLink').checked;
+      var linkSel = document.getElementById('f_linkTerrain');
+      if(isLink && linkSel){
+        def.linkTerrain = linkSel.value;
+        def.linkX = Math.max(0, Math.min(COLS-1, Number(document.getElementById('f_linkX').value)||0));
+        def.linkY = Math.max(0, Math.min(ROWS-1, Number(document.getElementById('f_linkY').value)||0));
+      } else {
+        def.linkTerrain = null; def.linkX = null; def.linkY = null;
+      }
+    }
     if(type==='character' || type==='mob'){
       def.health = Number(document.getElementById('f_health').value)||0;
       def.speed = Number(document.getElementById('f_speed').value)||0;
@@ -938,18 +1018,19 @@
 
   // ---------------- Terrain painter (visual alternative to typing setBlock calls) ----------------
   var terrainModalBg = document.getElementById('terrainModalBg');
+  var terrainTabsEl = document.getElementById('terrainTabs');
   var terrainPaletteEl = document.getElementById('terrainPalette');
   var terrainGridEl = document.getElementById('terrainGrid');
-  var terrainState = null;   // COLS x ROWS array of block names (or null), live while the modal is open
-  var terrainBrush = null;   // selected block name, or null = eraser
+  var terrainState = null;        // COLS x ROWS array of block names (or null), live while the modal is open
+  var terrainBrush = null;        // selected block name, or null = eraser
   var terrainPainting = false;
+  var activeEditTerrain = DEFAULT_TERRAIN;
 
-  function openTerrainPainter(){
-    terrainState = [];
-    for(var r=0;r<ROWS;r++){ terrainState.push(scene.grid[r] ? scene.grid[r].slice() : new Array(COLS).fill(null)); }
+  function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+  function renderTerrainPalette(){
     var blockNames = Object.keys(resources.block);
-    terrainBrush = blockNames.length ? blockNames[0] : null;
+    if(!blockNames.length || blockNames.indexOf(terrainBrush) === -1) terrainBrush = blockNames.length ? blockNames[0] : null;
 
     terrainPaletteEl.innerHTML = '';
     blockNames.forEach(function(nm){
@@ -967,7 +1048,7 @@
     });
     var eraser = document.createElement('button');
     eraser.type = 'button';
-    eraser.className = 'terrainSwatch' + (blockNames.length ? '' : ' selected');
+    eraser.className = 'terrainSwatch' + (terrainBrush===null ? ' selected':'');
     eraser.textContent = '\u2716';
     eraser.title = 'Eraser';
     eraser.addEventListener('click', function(){
@@ -976,8 +1057,74 @@
       eraser.classList.add('selected');
     });
     terrainPaletteEl.appendChild(eraser);
+  }
 
+  function renderTerrainTabs(){
+    terrainTabsEl.innerHTML = '';
+    Object.keys(scene.terrains).forEach(function(name){
+      var tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'terrainTab' + (name===activeEditTerrain ? ' active':'');
+      tab.textContent = name;
+      tab.addEventListener('click', function(){
+        if(name === activeEditTerrain) return;
+        commitPainterState();
+        activeEditTerrain = name;
+        renderTerrainTabs();
+        loadTerrainIntoPainter(name);
+      });
+      terrainTabsEl.appendChild(tab);
+    });
+    var addTab = document.createElement('button');
+    addTab.type = 'button';
+    addTab.className = 'terrainTab addNew';
+    addTab.textContent = '+ New';
+    addTab.addEventListener('click', function(){
+      commitPainterState();
+      var suggested = 'Terrain ' + (Object.keys(scene.terrains).length + 1);
+      var name = prompt('Name this new terrain:', suggested);
+      if(!name) return;
+      name = name.trim();
+      if(!name) return;
+      if(!scene.terrains[name]){ ensureTerrain(name); }
+      activeEditTerrain = name;
+      renderTerrainTabs();
+      loadTerrainIntoPainter(name);
+    });
+    terrainTabsEl.appendChild(addTab);
+  }
+
+  function loadTerrainIntoPainter(name){
+    var t = ensureTerrain(name);
+    terrainState = t.grid.map(function(row){ return row.slice(); });
     renderTerrainGrid();
+  }
+  function commitPainterState(){
+    if(!terrainState) return;
+    var t = ensureTerrain(activeEditTerrain);
+    t.grid = terrainState.map(function(row){ return row.slice(); });
+  }
+
+  function openTerrainPainter(createNew){
+    var names = Object.keys(scene.terrains);
+    if(createNew){
+      var suggested = 'Terrain ' + (names.length + 1);
+      var name = prompt('Name this new terrain:', suggested);
+      if(!name){ if(!names.length) return; name = names[0]; }
+      else {
+        name = name.trim() || suggested;
+        ensureTerrain(name);
+      }
+      activeEditTerrain = name;
+    } else {
+      activeEditTerrain = (activeEditTerrain && scene.terrains[activeEditTerrain]) ? activeEditTerrain
+        : (scene.terrains[scene.active] ? scene.active : (names[0] || DEFAULT_TERRAIN));
+      ensureTerrain(activeEditTerrain);
+    }
+
+    renderTerrainPalette();
+    renderTerrainTabs();
+    loadTerrainIntoPainter(activeEditTerrain);
     terrainModalBg.classList.add('open');
   }
 
@@ -1010,32 +1157,39 @@
   terrainGridEl.addEventListener('mousemove', function(e){ if(!terrainPainting) return; paintAt(e.clientX,e.clientY); });
   window.addEventListener('mouseup', function(){ terrainPainting=false; });
 
-  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); }
+  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); terrainState = null; }
   document.getElementById('terrainCancelBtn').addEventListener('click', closeTerrainPainter);
   terrainModalBg.addEventListener('click', function(e){ if(e.target===terrainModalBg) closeTerrainPainter(); });
 
-  document.getElementById('terrainDoneBtn').addEventListener('click', function(){
-    var lines = ['// --- terrain:start ---'];
+  function writeTerrainCodeBlock(name, grid){
+    var lines = ['// --- terrain:'+name+':start ---'];
     for(var r=0;r<ROWS;r++){
       for(var c=0;c<COLS;c++){
-        if(terrainState[r][c]) lines.push('engine.setBlock('+c+', '+r+', "'+terrainState[r][c]+'");');
+        if(grid[r][c]) lines.push('engine.setBlock('+c+', '+r+', "'+grid[r][c]+'", "'+name+'");');
       }
     }
-    lines.push('// --- terrain:end ---');
+    lines.push('// --- terrain:'+name+':end ---');
     var block = lines.join('\n');
-    var marker = /\/\/ --- terrain:start ---[\s\S]*?\/\/ --- terrain:end ---/;
+    var marker = new RegExp('// --- terrain:'+escapeRegex(name)+':start ---[\\s\\S]*?// --- terrain:'+escapeRegex(name)+':end ---');
     if(marker.test(codeInput.value)){
       codeInput.value = codeInput.value.replace(marker, block);
     } else {
       var sep = (codeInput.value.length && !/\n$/.test(codeInput.value)) ? '\n' : '';
       codeInput.value = codeInput.value + sep + block + '\n';
     }
+  }
+
+  document.getElementById('terrainDoneBtn').addEventListener('click', function(){
+    commitPainterState();
+    Object.keys(scene.terrains).forEach(function(name){
+      writeTerrainCodeBlock(name, scene.terrains[name].grid);
+    });
     closeTerrainPainter();
     runCode();
   });
 
-  document.getElementById('terrainAddBtn').addEventListener('click', openTerrainPainter);
-  document.getElementById('terrainEditBtn').addEventListener('click', openTerrainPainter);
+  document.getElementById('terrainAddBtn').addEventListener('click', function(){ openTerrainPainter(true); });
+  document.getElementById('terrainEditBtn').addEventListener('click', function(){ openTerrainPainter(false); });
 
   // ---------------- init ----------------
   if(!loadLocal()){ applyDefaults(); }

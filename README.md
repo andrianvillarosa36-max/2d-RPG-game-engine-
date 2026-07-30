@@ -44,19 +44,22 @@ website via a Trusted Web Activity if you ever want that.
 
 | Call | What it does |
 |---|---|
-| `engine.setBlock(x, y, name)` | Places a registered Block resource at grid cell (x,y) |
-| `engine.clearBlock(x, y)` | Removes whatever block is at (x,y) |
-| `engine.addCharacter(name, x, y)` | Places a registered Character at (x,y) |
-| `engine.addNPC(name, x, y)` | Places a registered NPC |
-| `engine.addMob(name, x, y)` | Places a registered Mob |
-| `engine.addItem(name, x, y)` | Places a registered Item |
-| `engine.addCustom(name, x, y)` | Places a registered Custom resource |
-| `engine.clearAll()` | Empties the scene |
+| `engine.setBlock(x, y, name, terrain?)` | Places a registered Block at (x,y) in `terrain` (default `"Terrain 1"`) |
+| `engine.clearBlock(x, y, terrain?)` | Removes whatever block is at (x,y) in that terrain |
+| `engine.addCharacter(name, x, y, terrain?)` | Places a registered Character at (x,y) in that terrain |
+| `engine.addNPC(name, x, y, terrain?)` | Places a registered NPC |
+| `engine.addMob(name, x, y, terrain?)` | Places a registered Mob |
+| `engine.addItem(name, x, y, terrain?)` | Places a registered Item |
+| `engine.addCustom(name, x, y, terrain?)` | Places a registered Custom resource |
+| `engine.setActiveTerrain(terrain)` | Makes `terrain` the one shown/played on start (default `"Terrain 1"`) |
+| `engine.clearAll()` | Empties every terrain |
 | `engine.log(...)` | Prints to the status bar instead of the canvas |
 
-The grid is 9×6 cells, (0,0) at top-left. `name` always refers to a resource
-you created with the `+` buttons — that's the link between the visual side
-and the code side.
+The grid is 9×6 cells per terrain, (0,0) at top-left. `name` always refers
+to a resource you created with the `+` buttons — that's the link between
+the visual side and the code side. Leave off `terrain` and everything goes
+into `"Terrain 1"`, so any script written before terrains existed still
+works unchanged.
 
 ## Controls & combat
 
@@ -109,20 +112,32 @@ Two layers, on purpose:
   APK can wipe that, so export first if you want to keep what you built,
   then import it back once the new build is installed.
 
-## Terrain painter
+## Terrain painter — and connecting multiple terrains
 
 Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
-fast. **+ Terrain** (and **Edit Terrain** — same tool, either button opens
-it) gives you a paint-by-tapping grid instead: pick a block along the top,
-tap or drag across the grid to fill it in, tap **✕** to erase. **Done**
-writes the result into your script as `setBlock` calls between
-`// --- terrain:start ---` / `// --- terrain:end ---` markers — reopening
-the painter later edits that same block in place instead of piling up
-duplicates.
+fast. **+ Terrain** (and **Edit Terrain** — same tool) gives you a
+paint-by-tapping grid instead: pick a block along the top, tap or drag
+across the grid to fill it in, tap **✕** to erase.
 
-The script stays the source of truth; the painter is just a faster way to
-write part of it. Hand-editing inside (or outside) those markers works
-exactly like any other code.
+The tab bar at the top of the painter is what makes this multiple *places*
+instead of one big room: each tab is a separate 9×6 terrain with its own
+layout. Tap **+ New** to create another one (e.g. paint "Terrain 1" as a
+village, **+ New** → name it "Cave" → paint that separately) — switching
+tabs keeps whatever you painted on the one you're leaving, and **Done**
+writes *all* of them into your script at once, each in its own
+`// --- terrain:<name>:start ---` / `:end` block.
+
+**Connecting them** happens through blocks, not the painter itself: open
+**Edit Block** on whichever block should act as the road/door (or make a
+new one just for this), check **"Leads to another terrain"**, and pick the
+target terrain + the (x,y) the Hero should land on there. Walk onto that
+block in play mode and you're switched straight into the other terrain,
+Hero HP and all — nothing resets. Set this up in both directions if you
+want a way back (a door only goes where you point it).
+
+The script stays the source of truth throughout; the painter and the link
+checkbox are just faster ways to write parts of it. Hand-editing inside
+(or outside) the terrain markers works exactly like any other code.
 
 ## Sprite images
 
@@ -131,6 +146,12 @@ flat colour circle — open **Edit Character** (or NPC/Mob/Item/Custom) →
 "Sprite image" → pick a photo/PNG from your phone. It's stored as the
 image data itself inside the resource, so it travels with autosave and
 Export/Import automatically — no separate asset files to manage.
+
+*(If you tried this before and the picker never opened: that was a real
+bug, not something you did wrong — a plain Android WebView doesn't let
+`<input type="file">` open anything unless the app explicitly wires it up
+to a native picker. `MainActivity.kt` now does that via `WebChromeClient`,
+so this needs the rebuilt APK to actually work.)*
 
 **Characters** additionally get **Sprite columns / rows**: if your image
 is a sheet of several poses, say how many frames across and down, and the
@@ -150,7 +171,7 @@ MiniEngine2D/
 │   ├── build.gradle              ← app module config
 │   └── src/main/
 │       ├── AndroidManifest.xml
-│       ├── java/.../MainActivity.kt   ← WebView shell + orientation bridge
+│       ├── java/.../MainActivity.kt   ← WebView shell + orientation/file-picker bridges
 │       └── assets/index.html     ← same engine, bundled into the APK
 ├── build.gradle                  ← root: plugin versions
 ├── settings.gradle
@@ -221,10 +242,13 @@ later is a good phase-2 task once the basics are working.
   Mob/Item/Custom, but terrain blocks are flat coloured squares for now.
 - **Sprite animation is a simple frame-cycle**, not direction-aware — see
   "Sprite images" above.
+- **Each terrain is a fixed 9×6 grid** — multiple terrains linked by doors
+  is how you build something bigger, rather than one giant scrolling map.
+- **Terrain links are one-way** — walking onto a linked block sends you to
+  a fixed spot in the target terrain; you set up the return door yourself.
 - **No syntax highlighting** — the code box is a plain `<textarea>`.
-- **Fixed 9×6 grid**, not resizable or scrollable from the UI yet.
 - **One controllable Character** — the joystick/action button always
-  target whichever Character was placed first in the script.
+  target whichever Character is in the active terrain.
 - **Mobs don't move** — they stand still until bumped; no patrol/chase AI.
 - **Not sandboxed.** Your script runs with full JS access (like any code
   editor's live preview, e.g. CodePen). Fine for your own single-player
@@ -235,8 +259,8 @@ later is a good phase-2 task once the basics are working.
 1. **Real code editor** — swap the `<textarea>` for CodeMirror (line
    numbers, syntax highlighting, bracket matching).
 2. **Block textures** — image support for terrain blocks, not just entities.
-3. **Bigger, scrollable maps** — beyond the fixed 9×6 grid, with a camera
-   that follows the Hero.
+3. **Two-way terrain links** — auto-create (or at least suggest) a return
+   door when you link one terrain to another.
 4. **Mob AI** — patrol/chase behaviour instead of standing still. Would
    want its own sprite animation too, once mobs actually move.
 5. **Named, multi-project saves** — right now there's one autosave slot;

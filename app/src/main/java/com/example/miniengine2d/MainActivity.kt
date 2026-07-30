@@ -19,22 +19,27 @@ import android.webkit.WebViewClient
  * desktop browser before ever touching Android Studio or Gradle.
  *
  * Two bits of native surface area:
- * - [OrientationBridge]: the web Screen Orientation API is unreliable inside
- *   a plain WebView, so play mode's landscape lock goes through the
- *   Activity itself. JS calls window.Android.lockLandscape() /
- *   unlockOrientation() and falls back to the web API if this bridge isn't
- *   present (e.g. testing preview.html in a desktop browser).
- * - The file-chooser handling below: a bare WebView has no default way to
- *   satisfy <input type="file"> - that's what was silently doing nothing
- *   when picking a "Sprite image". A WebChromeClient with
- *   onShowFileChooser() is what actually launches Android's photo picker
- *   and hands the result back to the page's FileReader code, which was
- *   already correct and needed no changes.
+ *
+ * 1. [OrientationBridge] - the web Screen Orientation API is unreliable
+ *    inside a plain WebView (it mostly expects true browser fullscreen
+ *    first), so play mode's landscape lock goes through the Activity
+ *    directly. JS calls window.Android.lockLandscape() / unlockOrientation()
+ *    and falls back to the web API if this bridge isn't present (e.g.
+ *    testing preview.html in a desktop browser).
+ *
+ * 2. The WebChromeClient below - a plain WebView silently does nothing
+ *    when an <input type="file"> is tapped unless the app explicitly hands
+ *    that request off to a native picker. This is what makes "Sprite
+ *    image" in the resource editor actually open your photos.
  */
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
+    companion object {
+        private const val FILE_CHOOSER_REQUEST = 51
+    }
 
     inner class OrientationBridge {
         @JavascriptInterface
@@ -63,18 +68,16 @@ class MainActivity : Activity() {
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
-                webView: WebView?,
+                view: WebView?,
                 callback: ValueCallback<Array<Uri>>?,
-                params: WebChromeClient.FileChooserParams?
+                params: FileChooserParams?
             ): Boolean {
                 filePathCallback?.onReceiveValue(null)
                 filePathCallback = callback
-
                 val intent = params?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
                     type = "image/*"
                     addCategory(Intent.CATEGORY_OPENABLE)
                 }
-
                 return try {
                     @Suppress("DEPRECATION")
                     startActivityForResult(Intent.createChooser(intent, "Choose a sprite image"), FILE_CHOOSER_REQUEST)
@@ -91,18 +94,12 @@ class MainActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == FILE_CHOOSER_REQUEST) {
-            val callback = filePathCallback
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
+            filePathCallback?.onReceiveValue(if (uri != null) arrayOf(uri) else null)
             filePathCallback = null
-            if (callback == null) return
-            val results: Array<Uri>? = if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                arrayOf(data.data!!)
-            } else {
-                null
-            }
-            callback.onReceiveValue(results)
-            return
+        } else {
+            super.onActivityResult(requestCode, resultCode, data)
         }
-        super.onActivityResult(requestCode, resultCode, data)
     }
 
     override fun onBackPressed() {
@@ -113,9 +110,4 @@ class MainActivity : Activity() {
             super.onBackPressed()
         }
     }
-
-    companion object {
-        private const val FILE_CHOOSER_REQUEST = 51426
-    }
 }
-
