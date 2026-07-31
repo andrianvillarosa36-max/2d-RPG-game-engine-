@@ -89,7 +89,8 @@ from scratch.
 
 Tap **▶ Run** and the preview takes over the whole screen and locks to
 landscape — an actual play-test view instead of the cramped top-half
-editor preview. Tap the **✕** top-right to come back to the editor.
+editor preview. Tap the **✕** at the bottom-center to come back to the
+editor (bottom, not top - see "Why the bottom" below).
 
 Landscape lock goes through a tiny native bridge (`MainActivity.kt` exposes
 `window.Android.lockLandscape()`), because the web-only Screen Orientation
@@ -116,9 +117,18 @@ Two layers, on purpose:
 
 Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
 fast. **+ Terrain** (and **Edit Terrain** — same tool) opens a full-screen
-painter: title and tabs are pinned at the top (they don't scroll away, no
-matter how tall the grid gets), pick a block, tap or drag across the grid
-to fill it in, tap **✕** to erase.
+painter: the grid is up top, and the tabs, block palette, and Cancel/Done
+buttons all live in a panel anchored to the **bottom** of the screen.
+
+**Why the bottom:** the first version pinned those controls near the top,
+which turned out to sit right under the status bar / camera cutout on a
+lot of phones — visible, but not reliably tappable. Two things fixed it:
+`targetSdk` was quietly forcing edge-to-edge display (Android does this by
+default from API 35), which is why content was landing under the system
+bars in the first place - it's back to 34. And on top of that, none of
+this app's controls depend on the very top edge being tappable anymore,
+on any screen, so the same class of bug can't quietly reappear even if a
+future device turns out to be picky about insets in some other way.
 
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own
