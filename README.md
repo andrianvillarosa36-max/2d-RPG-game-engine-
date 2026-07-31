@@ -115,9 +115,10 @@ Two layers, on purpose:
 ## Terrain painter — and connecting multiple terrains
 
 Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
-fast. **+ Terrain** (and **Edit Terrain** — same tool) gives you a
-paint-by-tapping grid instead: pick a block along the top, tap or drag
-across the grid to fill it in, tap **✕** to erase.
+fast. **+ Terrain** (and **Edit Terrain** — same tool) opens a full-screen
+painter: title and tabs are pinned at the top (they don't scroll away, no
+matter how tall the grid gets), pick a block, tap or drag across the grid
+to fill it in, tap **✕** to erase.
 
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own

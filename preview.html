@@ -23,7 +23,7 @@
   #app{ display:flex; flex-direction:column; height:100vh; }
 
   /* ---------- Preview (top half) ---------- */
-  #previewPane{ flex:0 0 44%; background:var(--dusk); display:flex; flex-direction:column; border-bottom:1px solid var(--rune); min-height:0; }
+  #previewPane{ flex:0 0 auto; background:var(--dusk); display:flex; flex-direction:column; border-bottom:1px solid var(--rune); }
   #previewHeader{ display:flex; align-items:center; justify-content:space-between; padding:8px 12px;
     font-family:var(--mono); font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--mist-dim);
     border-bottom:1px solid var(--rune); flex:0 0 auto; gap:8px; }
@@ -33,8 +33,8 @@
   #hudInfo{ flex:1; text-align:center; }
   @media (prefers-reduced-motion: reduce){ #previewHeader .dot{ animation:none; } }
   @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
-  #canvasWrap{ flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:14px; min-height:0; position:relative; }
-  #gameCanvas{ background:var(--ink); border-radius:3px; width:100%; height:100%; object-fit:contain;
+  #canvasWrap{ flex:0 0 auto; display:flex; align-items:center; justify-content:center; padding:14px; position:relative; }
+  #gameCanvas{ background:var(--ink); border-radius:3px; display:block; width:100%; height:auto;
     box-shadow: 0 0 0 2px var(--dusk-2), 0 0 0 4px var(--gold); touch-action:none; }
 
   /* ---------- Joystick overlay ---------- */
@@ -131,7 +131,9 @@
 
   /* ---------- Play mode (fullscreen + landscape) ---------- */
   body.playMode #toolbar, body.playMode #palette, body.playMode #editorPane{ display:none; }
-  body.playMode #previewPane{ flex:1 1 auto; border-bottom:none; }
+  body.playMode #previewPane{ flex:1 1 auto; border-bottom:none; min-height:0; }
+  body.playMode #canvasWrap{ flex:1 1 auto; min-height:0; }
+  body.playMode #gameCanvas{ width:100%; height:100%; object-fit:contain; }
   #exitPlayBtn{ display:none; position:absolute; top:10px; right:10px; z-index:8;
     width:34px; height:34px; border-radius:50%; background:rgba(13,11,24,.7); color:var(--mist);
     border:1px solid var(--rune); font-size:14px; align-items:center; justify-content:center; }
@@ -150,11 +152,11 @@
   #actionBtn:active{ transform:translateY(1px); }
 
   /* ---------- Terrain painter ---------- */
-  #terrainModalBg{ position:fixed; inset:0; background:rgba(6,5,12,.65); display:none; align-items:flex-end; justify-content:center; z-index:50; }
-  #terrainModalBg.open{ display:flex; }
-  #terrainModal{ background:var(--dusk); width:100%; max-width:480px; border-radius:10px 10px 0 0;
-    max-height:88vh; box-shadow:0 0 0 2px var(--gold) inset; display:flex; flex-direction:column; overflow:hidden; }
-  #terrainModalHead{ flex:0 0 auto; padding:16px 16px 0; }
+  #terrainModalBg{ position:fixed; inset:0; background:var(--ink); display:none; z-index:50; }
+  #terrainModalBg.open{ display:flex; flex-direction:column; }
+  #terrainModal{ flex:1; width:100%; min-height:0; display:flex; flex-direction:column; background:var(--dusk); }
+  #terrainModalHead{ flex:0 0 auto; position:sticky; top:0; z-index:2; background:var(--dusk);
+    padding:16px 16px 4px; border-bottom:1px solid var(--rune); }
   #terrainModalHead h3{ margin:0 0 10px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold); }
   #terrainPalette{ display:flex; gap:6px; overflow-x:auto; padding-bottom:12px; -webkit-overflow-scrolling:touch; }
   #terrainTabs{ display:flex; gap:6px; overflow-x:auto; padding-bottom:12px; -webkit-overflow-scrolling:touch; }
@@ -165,11 +167,12 @@
   .terrainSwatch{ flex:0 0 auto; width:42px; height:42px; border-radius:6px; border:2px solid var(--rune);
     display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--mist); }
   .terrainSwatch.selected{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
-  #terrainGridScroll{ flex:1 1 auto; overflow-y:auto; padding:0 16px 14px; -webkit-overflow-scrolling:touch; min-height:0; }
+  #terrainGridScroll{ flex:1 1 auto; overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; min-height:0; }
   #terrainGrid{ display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--ink);
-    padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none; }
+    padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none; max-width:480px; margin:0 auto; }
   .terrainCell{ aspect-ratio:1; border-radius:2px; background:#1c1926; }
-  #terrainModal .modalBtns{ flex:0 0 auto; margin:0; padding:12px 16px 16px; border-top:1px solid var(--rune); }
+  #terrainModal .modalBtns{ flex:0 0 auto; margin:0; padding:12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--rune); background:var(--dusk); max-width:480px; width:100%; margin:0 auto; box-sizing:border-box; }
 
   /* ---------- Sprite upload preview ---------- */
   .spritePreview{ display:flex; align-items:center; gap:10px; margin-top:8px; }
@@ -348,6 +351,7 @@
   var DEFAULT_TERRAIN = 'Terrain 1';
   var canvas = document.getElementById('gameCanvas');
   canvas.width = COLS*CELL; canvas.height = ROWS*CELL;
+  canvas.style.aspectRatio = COLS + ' / ' + ROWS;
   var ctx = canvas.getContext('2d');
 
   // A scene is a set of named terrains (each its own COLS x ROWS grid +
