@@ -130,6 +130,20 @@ this app's controls depend on the very top edge being tappable anymore,
 on any screen, so the same class of bug can't quietly reappear even if a
 future device turns out to be picky about insets in some other way.
 
+Also fixed in the same pass: Cancel/Done (and the eraser swatch) were
+rendering with no set colour, which meant near-white text on the browser's
+default near-white button background — readable nowhere. Every button in
+every modal now has an explicit colour by default, not just the ones that
+happened to get a hand-written style, so this shouldn't come back either.
+
+**Where "connect" actually lives:** it was never inside the painter — it's
+a property on the *block itself*. The painter now says so directly
+(there's a line above Cancel/Done reminding you), but to spell it out:
+close the painter, **Edit Block** on whichever block should act as the
+door, check **"Leads to another terrain"**, pick the target + landing
+spot. That's the whole feature; nothing else needs to happen inside the
+terrain painter to "activate" a connection.
+
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own
 layout. Tap **+ New** to create another one (e.g. paint "Terrain 1" as a
