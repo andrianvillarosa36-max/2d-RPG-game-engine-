@@ -52,6 +52,7 @@ website via a Trusted Web Activity if you ever want that.
 | `engine.addItem(name, x, y, terrain?)` | Places a registered Item |
 | `engine.addCustom(name, x, y, terrain?)` | Places a registered Custom resource |
 | `engine.setActiveTerrain(terrain)` | Makes `terrain` the one shown/played on start (default `"Terrain 1"`) |
+| `engine.addConnector(x, y, toTerrain, toX, toY, terrain?)` | Places a terrain-transition point at (x,y) leading to (toX,toY) in `toTerrain` |
 | `engine.clearAll()` | Empties every terrain |
 | `engine.log(...)` | Prints to the status bar instead of the canvas |
 
@@ -136,14 +137,6 @@ default near-white button background — readable nowhere. Every button in
 every modal now has an explicit colour by default, not just the ones that
 happened to get a hand-written style, so this shouldn't come back either.
 
-**Where "connect" actually lives:** it was never inside the painter — it's
-a property on the *block itself*. The painter now says so directly
-(there's a line above Cancel/Done reminding you), but to spell it out:
-close the painter, **Edit Block** on whichever block should act as the
-door, check **"Leads to another terrain"**, pick the target + landing
-spot. That's the whole feature; nothing else needs to happen inside the
-terrain painter to "activate" a connection.
-
 **Naming a new terrain no longer uses a popup.** It used to call
 JavaScript's `prompt()`, which needs the native app to explicitly hand it
 off to a real dialog - this app's `WebView` never did that, so there's a
@@ -162,15 +155,26 @@ tabs keeps whatever you painted on the one you're leaving, and **Done**
 writes *all* of them into your script at once, each in its own
 `// --- terrain:<name>:start ---` / `:end` block.
 
-**Connecting them** happens through blocks, not the painter itself: a dark
-brown **Road** block is now created for you automatically (once, the first
-time you load this update — it won't come back if you delete it on
-purpose), already non-solid and ready to paint with. Open **Edit Block** on
-it (or any block), check **"Leads to another terrain"**, and pick the
-target terrain + the (x,y) the Hero should land on there. Walk onto that
-block in play mode and you're switched straight into the other terrain,
-Hero HP and all — nothing resets. Set this up in both directions if you
-want a way back (a door only goes where you point it).
+## Connecting terrains: the Terrain Connector
+
+Connecting terrains used to be a property on a *block* — check "leads to
+another terrain" on the Road block, pick a destination, done. That fell
+apart the moment you had more than one connection: the destination lived
+on the block *type*, so every Road everywhere led to the same place. Three
+terrains in and you'd need a new block resource per connection just to
+give each one a different destination — exactly the wall you hit.
+
+**+ Terrain Connector** (and **Edit Terrain Connector** — same tool) fixes
+this by making a connection belong to the *specific spot* you place it,
+not to a block type. Any block can sit underneath a connector for looks —
+same "Road" everywhere is fine now — the destination is stored separately
+per placement. Open the tool: pick a **From** terrain and tap a cell on
+its grid, pick a **To** terrain and tap a cell there, leave **"Also create
+a path back"** checked if you want both directions in one go, **Save**.
+Walk onto that cell in play mode (look for the gold ring with an arrow)
+and you're switched straight into the other terrain, Hero HP and all —
+nothing resets. **Edit Terrain Connector** lists every connector you've
+made so far so you can tap one to change or delete it.
 
 The script stays the source of truth throughout; the painter and the link
 checkbox are just faster ways to write parts of it. Hand-editing inside
@@ -281,8 +285,10 @@ later is a good phase-2 task once the basics are working.
   "Sprite images" above.
 - **Each terrain is a fixed 9×6 grid** — multiple terrains linked by doors
   is how you build something bigger, rather than one giant scrolling map.
-- **Terrain links are one-way** — walking onto a linked block sends you to
-  a fixed spot in the target terrain; you set up the return door yourself.
+- **Each connector is still one direction under the hood** — "Also create
+  a path back" makes both at once by default, but if you turn that off
+  (or delete just one side later) the other direction won't exist until
+  you add it.
 - **No syntax highlighting** — the code box is a plain `<textarea>`.
 - **One controllable Character** — the joystick/action button always
   target whichever Character is in the active terrain.
