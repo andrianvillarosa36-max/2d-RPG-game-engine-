@@ -203,17 +203,35 @@ rather than a walk cycle, tell me the layout in chat and I'll change the
 logic to pick a row by direction instead of just cycling — I didn't want
 to guess wrong from the image alone and lock in the wrong behaviour.
 
+## App icon
+
+A gear at the centre, eight spokes radiating out - meant to read as both
+"engine" and "terrains connected to each other," in the app's actual gold
+on deep indigo instead of the generic blue-on-green a stock icon usually
+comes in. Colours are the exact same `--gold`/`--ink`/`--rune` values the
+rest of the app uses, so the icon and the app it opens actually look like
+the same product.
+
+It ships two ways: a plain square PNG for older devices, and a proper
+Android adaptive icon (background colour + separate foreground layer) for
+API 26+, so it gets a clean circle/squircle/rounded-square mask instead of
+whatever crude auto-crop a launcher would apply to a flat image. Regenerate
+it anytime with `python3 gen_icon.py` if you want to tweak colours or
+proportions — it's plain PIL, no image editor needed.
+
 ## Project layout
 
 ```
 MiniEngine2D/
 ├── preview.html                 ← the engine, standalone (for browser testing)
+├── gen_icon.py                  ← regenerates the app icon (plain PIL)
 ├── app/
 │   ├── build.gradle              ← app module config
 │   └── src/main/
 │       ├── AndroidManifest.xml
 │       ├── java/.../MainActivity.kt   ← WebView shell + orientation/file-picker bridges
-│       └── assets/index.html     ← same engine, bundled into the APK
+│       ├── assets/index.html     ← same engine, bundled into the APK
+│       └── res/mipmap-*/, values/colors.xml   ← app icon (legacy + adaptive)
 ├── build.gradle                  ← root: plugin versions
 ├── settings.gradle
 ├── gradle.properties
