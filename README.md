@@ -144,6 +144,16 @@ door, check **"Leads to another terrain"**, pick the target + landing
 spot. That's the whole feature; nothing else needs to happen inside the
 terrain painter to "activate" a connection.
 
+**Naming a new terrain no longer uses a popup.** It used to call
+JavaScript's `prompt()`, which needs the native app to explicitly hand it
+off to a real dialog - this app's `WebView` never did that, so there's a
+real chance it was silently failing rather than asking you anything. **+
+New terrain** is now a plain text box + Add button built into the painter
+itself, pre-filled with a suggested name when you tap **+ Terrain**. Every
+other popup (`alert()`) in the editor got replaced the same way, with a
+message that appears in the modal instead of a dialog that may not have
+been showing at all.
+
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own
 layout. Tap **+ New** to create another one (e.g. paint "Terrain 1" as a

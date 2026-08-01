@@ -105,6 +105,8 @@
   #saveBtn, #ioActionBtn, #terrainDoneBtn{ background:var(--gold); color:var(--ink); border-color:var(--gold); font-weight:700; }
   #deleteBtn{ background:transparent; color:var(--ember); border-color:rgba(255,107,107,.35); }
   #existingList{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  #modalError{ margin:0 0 10px; font-family:var(--sans); font-size:12px; color:var(--ember); }
+  #modalError:empty{ display:none; }
   #existingList button{ background:var(--dusk-2); border:1px solid var(--rune); color:var(--mist); border-radius:4px;
     padding:6px 10px; font-family:var(--mono); font-size:11px; }
   #existingList button.active{ border-color:var(--gold); color:var(--gold); }
@@ -154,25 +156,34 @@
   #actionBtn:active{ transform:translateY(1px); }
 
   /* ---------- Terrain painter ---------- */
-  #terrainModalBg{ position:fixed; inset:0; background:var(--ink); display:none; z-index:50; }
-  #terrainModalBg.open{ display:flex; flex-direction:column; }
-  #terrainModal{ flex:1; width:100%; min-height:0; display:flex; flex-direction:column; background:var(--dusk); }
-  #terrainGridScroll{ flex:1 1 auto; overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; min-height:0;
-    display:flex; align-items:center; justify-content:center; }
+  /* One scrolling container, not nested ones - simpler and less fragile.
+     The footer sticks to the bottom of that single scroll, so it's always
+     reachable whether the grid is short (common) or ever needs to scroll. */
+  #terrainModalBg{ position:fixed; inset:0; background:var(--ink); display:none; z-index:50;
+    overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #terrainModalBg.open{ display:block; }
+  #terrainModal{ min-height:100%; display:flex; flex-direction:column; background:var(--dusk); }
+  #terrainGridScroll{ flex:0 0 auto; padding:16px; display:flex; align-items:center; justify-content:center; }
   #terrainGrid{ display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--ink);
-    padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none; max-width:480px; margin:0 auto; }
+    padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none;
+    max-width:480px; width:100%; margin:0 auto; }
   .terrainCell{ aspect-ratio:1; border-radius:2px; background:#1c1926; }
   /* Everything you interact with lives down here, on purpose - the very top
      of the screen sits under the status bar / camera cutout on a lot of
      phones and isn't reliably tappable, so nothing important goes there. */
-  #terrainModalFoot{ flex:0 0 auto; background:var(--dusk-2); border-top:1px solid var(--rune);
+  #terrainModalFoot{ flex:0 0 auto; margin-top:auto; position:sticky; bottom:0;
+    background:var(--dusk-2); border-top:1px solid var(--rune);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); max-width:480px; width:100%;
-    margin:0 auto; box-sizing:border-box; }
+    margin-left:auto; margin-right:auto; box-sizing:border-box; }
   #terrainTabs{ display:flex; gap:6px; overflow-x:auto; padding-bottom:10px; -webkit-overflow-scrolling:touch; }
   .terrainTab{ flex:0 0 auto; padding:7px 13px; border-radius:14px; border:1px solid var(--rune);
     background:var(--dusk); color:var(--mist-dim); font-family:var(--mono); font-size:11px; white-space:nowrap; }
   .terrainTab.active{ border-color:var(--gold); color:var(--gold); }
-  .terrainTab.addNew{ color:var(--gold); border-style:dashed; }
+  #terrainAddRow{ display:flex; gap:6px; margin-bottom:12px; }
+  #terrainAddRow input{ flex:1; min-width:0; background:var(--ink); border:1px solid var(--rune); border-radius:8px;
+    padding:8px 10px; color:var(--mist); font-size:13px; font-family:var(--sans); }
+  #terrainAddRow button{ flex:0 0 auto; background:var(--gold); color:var(--ink); border:none; border-radius:8px;
+    padding:8px 14px; font-family:var(--mono); font-size:12px; font-weight:700; }
   #terrainPalette{ display:flex; gap:6px; overflow-x:auto; padding-bottom:12px; -webkit-overflow-scrolling:touch; }
   .terrainSwatch{ flex:0 0 auto; width:42px; height:42px; border-radius:6px; border:2px solid var(--rune);
     background:var(--dusk-2);
@@ -180,6 +191,8 @@
   .terrainSwatch.selected{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
   #terrainLinkHint{ margin:0 0 10px; font-family:var(--sans); font-size:11px; line-height:1.4; color:var(--mist-dim); }
   #terrainLinkHint b{ color:var(--mist); font-weight:600; }
+  #terrainError{ margin:0 0 10px; font-family:var(--sans); font-size:12px; color:var(--ember); }
+  #terrainError:empty{ display:none; }
   #terrainModalFoot .modalBtns{ margin:0; }
 
   /* ---------- Sprite upload preview ---------- */
@@ -247,6 +260,7 @@
     <h3 id="modalTitle">New Block</h3>
     <div id="existingList"></div>
     <div id="formFields"></div>
+    <p id="modalError"></p>
     <div class="modalBtns">
       <button id="cancelBtn" type="button">Cancel</button>
       <button id="deleteBtn" type="button" style="display:none;">Delete</button>
@@ -272,8 +286,13 @@
     <div id="terrainGridScroll"><div id="terrainGrid"></div></div>
     <div id="terrainModalFoot">
       <div id="terrainTabs"></div>
+      <div id="terrainAddRow">
+        <input type="text" id="terrainNewName" placeholder="New terrain name" maxlength="24">
+        <button type="button" id="terrainNewBtn">+ Add</button>
+      </div>
       <div id="terrainPalette"></div>
       <p id="terrainLinkHint">To make a block lead here from another terrain: close this, tap <b>Edit Block</b> on it, check <b>"Leads to another terrain"</b>.</p>
+      <p id="terrainError"></p>
       <div class="modalBtns">
         <button id="terrainCancelBtn" type="button">Cancel</button>
         <button id="terrainDoneBtn" type="button">Done</button>
@@ -832,7 +851,7 @@
       var linkFields = document.getElementById('linkFields');
       linkCk.addEventListener('change', function(){
         if(linkCk.checked && !document.getElementById('f_linkTerrain')){
-          alert('Create a terrain first (+ Terrain), then come back and link to it.');
+          document.getElementById('modalError').textContent = 'Create a terrain first (+ Terrain), then come back and link to it.';
           linkCk.checked = false;
           return;
         }
@@ -881,6 +900,7 @@
     fieldsFor(type, def);
     refreshExistingList(type);
     deleteBtn.style.display = def ? 'block' : 'none';
+    document.getElementById('modalError').textContent = '';
     modalBg.classList.add('open');
   }
   function closeModal(){ modalBg.classList.remove('open'); modalType=null; editingName=null; }
@@ -920,6 +940,7 @@
   }
 
   saveBtn.addEventListener('click', function(){
+    document.getElementById('modalError').textContent = '';
     try{
       var def = collectForm(modalType);
       var fileInput = document.getElementById('f_sprite');
@@ -932,13 +953,13 @@
           def.spriteUrl = reader.result;
           commitResource(def);
         };
-        reader.onerror = function(){ alert('Could not read that image - try a different file.'); };
+        reader.onerror = function(){ document.getElementById('modalError').textContent = 'Could not read that image - try a different file.'; };
         reader.readAsDataURL(file);
       } else {
         if(!pendingSpriteClear && prevSprite) def.spriteUrl = prevSprite;
         commitResource(def);
       }
-    }catch(err){ alert(err.message); }
+    }catch(err){ document.getElementById('modalError').textContent = err.message; }
   });
   function commitResource(def){
     if(editingName && editingName!==def.name) delete resources[modalType][editingName];
@@ -1103,23 +1124,30 @@
       });
       terrainTabsEl.appendChild(tab);
     });
-    var addTab = document.createElement('button');
-    addTab.type = 'button';
-    addTab.className = 'terrainTab addNew';
-    addTab.textContent = '+ New';
-    addTab.addEventListener('click', function(){
+  }
+
+  function showTerrainError(msg){ document.getElementById('terrainError').textContent = msg || ''; }
+
+  function handleAddTerrain(prefill){
+    var input = document.getElementById('terrainNewName');
+    var name = (prefill != null ? prefill : input.value).trim();
+    if(!name){ showTerrainError('Enter a name for the new terrain first.'); input.focus(); return; }
+    if(scene.terrains[name]){
+      showTerrainError('"'+name+'" already exists - switching to it.');
       commitPainterState();
-      var suggested = 'Terrain ' + (Object.keys(scene.terrains).length + 1);
-      var name = prompt('Name this new terrain:', suggested);
-      if(!name) return;
-      name = name.trim();
-      if(!name) return;
-      if(!scene.terrains[name]){ ensureTerrain(name); }
       activeEditTerrain = name;
+      input.value = '';
       renderTerrainTabs();
       loadTerrainIntoPainter(name);
-    });
-    terrainTabsEl.appendChild(addTab);
+      return;
+    }
+    showTerrainError('');
+    commitPainterState();
+    ensureTerrain(name);
+    activeEditTerrain = name;
+    input.value = '';
+    renderTerrainTabs();
+    loadTerrainIntoPainter(name);
   }
 
   function loadTerrainIntoPainter(name){
@@ -1135,25 +1163,24 @@
 
   function openTerrainPainter(createNew){
     var names = Object.keys(scene.terrains);
-    if(createNew){
-      var suggested = 'Terrain ' + (names.length + 1);
-      var name = prompt('Name this new terrain:', suggested);
-      if(!name){ if(!names.length) return; name = names[0]; }
-      else {
-        name = name.trim() || suggested;
-        ensureTerrain(name);
-      }
-      activeEditTerrain = name;
-    } else {
-      activeEditTerrain = (activeEditTerrain && scene.terrains[activeEditTerrain]) ? activeEditTerrain
-        : (scene.terrains[scene.active] ? scene.active : (names[0] || DEFAULT_TERRAIN));
-      ensureTerrain(activeEditTerrain);
-    }
+    activeEditTerrain = (activeEditTerrain && scene.terrains[activeEditTerrain]) ? activeEditTerrain
+      : (scene.terrains[scene.active] ? scene.active : (names[0] || DEFAULT_TERRAIN));
+    ensureTerrain(activeEditTerrain);
 
+    showTerrainError('');
     renderTerrainPalette();
     renderTerrainTabs();
     loadTerrainIntoPainter(activeEditTerrain);
     terrainModalBg.classList.add('open');
+
+    var nameInput = document.getElementById('terrainNewName');
+    if(createNew){
+      nameInput.value = 'Terrain ' + (names.length + 1);
+      nameInput.focus();
+      nameInput.select();
+    } else {
+      nameInput.value = '';
+    }
   }
 
   function renderTerrainGrid(){
@@ -1218,6 +1245,10 @@
 
   document.getElementById('terrainAddBtn').addEventListener('click', function(){ openTerrainPainter(true); });
   document.getElementById('terrainEditBtn').addEventListener('click', function(){ openTerrainPainter(false); });
+  document.getElementById('terrainNewBtn').addEventListener('click', function(){ handleAddTerrain(); });
+  document.getElementById('terrainNewName').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); handleAddTerrain(); }
+  });
 
   // ---------------- init ----------------
   if(!loadLocal()){ applyDefaults(); }
