@@ -458,16 +458,13 @@
     document.getElementById('gridInfo').textContent = scene.active + ' \u00B7 ' + COLS + '\u00D7' + ROWS;
     var t = currentTerrain();
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle = "#241d3f";
-    for(var x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
-    for(var y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(COLS*CELL,y*CELL); ctx.stroke(); }
 
     for(var r=0;r<ROWS;r++){
       for(var c=0;c<COLS;c++){
         var name = t.grid[r][c];
         if(!name) continue;
         var def = resources.block[name];
-        var bx = c*CELL+1, by = r*CELL+1, bw = CELL-2, bh = CELL-2;
+        var bx = c*CELL, by = r*CELL, bw = CELL, bh = CELL;
         var textured = false;
         if(def && def.spriteUrl){
           var bimg = getSpriteImage(def.spriteUrl);

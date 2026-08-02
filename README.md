@@ -212,6 +212,12 @@ chip, and the terrain painter's swatches and grid - paint with it and
 the grid actually looks like the ground you're placing, not just its
 average colour.
 
+The **live preview and play mode** draw blocks edge-to-edge with no grid
+lines between them, so adjacent textures blend into continuous terrain
+instead of looking like a checkerboard of tiles. The **terrain painter**
+still shows its own thin grid, on purpose — that one's a tool for placing
+things precisely, not the view your Hero actually walks around in.
+
 *(If you tried this before and the picker never opened: that was a real
 bug, not something you did wrong — a plain Android WebView doesn't let
 `<input type="file">` open anything unless the app explicitly wires it up
