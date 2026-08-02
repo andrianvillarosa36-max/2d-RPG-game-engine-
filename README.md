@@ -201,11 +201,16 @@ checkbox are just faster ways to write parts of it. Hand-editing inside
 
 ## Sprite images
 
-Every resource type except Block can carry an uploaded image instead of a
-flat colour circle — open **Edit Character** (or NPC/Mob/Item/Custom) →
-"Sprite image" → pick a photo/PNG from your phone. It's stored as the
-image data itself inside the resource, so it travels with autosave and
-Export/Import automatically — no separate asset files to manage.
+Every resource type — Block included — can carry an uploaded image
+instead of a flat colour. Open **Edit Block** (or Character/NPC/Mob/
+Item/Custom) → "Texture image" / "Sprite image" → pick a PNG from your
+phone (made in Pixel Studio or anywhere else). It's stored as the image
+data itself inside the resource, so it travels with autosave and
+Export/Import automatically — no separate asset files to manage. It
+shows up everywhere that resource does: the live preview, the palette
+chip, and the terrain painter's swatches and grid - paint with it and
+the grid actually looks like the ground you're placing, not just its
+average colour.
 
 *(If you tried this before and the picker never opened: that was a real
 bug, not something you did wrong — a plain Android WebView doesn't let
@@ -316,8 +321,6 @@ later is a good phase-2 task once the basics are working.
 
 ## Known limitations (v1)
 
-- **Blocks are still colour-only** — sprite images work for Character/NPC/
-  Mob/Item/Custom, but terrain blocks are flat coloured squares for now.
 - **Sprite animation is a simple frame-cycle**, not direction-aware — see
   "Sprite images" above.
 - **Each terrain is a fixed 9×6 grid** — multiple terrains linked by doors
@@ -338,14 +341,13 @@ later is a good phase-2 task once the basics are working.
 
 1. **Real code editor** — swap the `<textarea>` for CodeMirror (line
    numbers, syntax highlighting, bracket matching).
-2. **Block textures** — image support for terrain blocks, not just entities.
-3. **Two-way terrain links** — auto-create (or at least suggest) a return
+2. **Two-way terrain links** — auto-create (or at least suggest) a return
    door when you link one terrain to another.
-4. **Mob AI** — patrol/chase behaviour instead of standing still. Would
+3. **Mob AI** — patrol/chase behaviour instead of standing still. Would
    want its own sprite animation too, once mobs actually move.
-5. **Named, multi-project saves** — right now there's one autosave slot;
+4. **Named, multi-project saves** — right now there's one autosave slot;
    a proper "Save As" using Android's file picker
    (`Intent.ACTION_CREATE_DOCUMENT`) would allow several named projects.
-6. **Export finished games separately** — MiniEngine2D packages *your* game
+5. **Export finished games separately** — MiniEngine2D packages *your* game
    as its own APK, GDevelop-style. This is the long-term goal and a
    substantial project on its own — worth tackling once the basics feel solid.

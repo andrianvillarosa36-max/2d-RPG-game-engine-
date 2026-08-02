@@ -467,8 +467,19 @@
         var name = t.grid[r][c];
         if(!name) continue;
         var def = resources.block[name];
-        ctx.fillStyle = def ? def.color : "#555";
-        ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+        var bx = c*CELL+1, by = r*CELL+1, bw = CELL-2, bh = CELL-2;
+        var textured = false;
+        if(def && def.spriteUrl){
+          var bimg = getSpriteImage(def.spriteUrl);
+          if(bimg.complete && bimg.naturalWidth){
+            ctx.drawImage(bimg, bx, by, bw, bh);
+            textured = true;
+          }
+        }
+        if(!textured){
+          ctx.fillStyle = def ? def.color : "#555";
+          ctx.fillRect(bx, by, bw, bh);
+        }
         if (def && def.solid) {
           ctx.strokeStyle = 'rgba(13,11,24,.55)';
           ctx.lineWidth = 3;
@@ -870,19 +881,17 @@
     if(type==='item'){
       html += '<div class="field"><label>Effect</label><input type="text" id="f_effect" value="'+escapeHtml(def.effect||'')+'" placeholder="e.g. +10 health"></div>';
     }
-    if(type!=='block'){
-      html += '<div class="field"><label>Sprite image (optional)</label>' +
-        '<input type="file" id="f_sprite" accept="image/*">' +
-        (def.spriteUrl ? '<div class="spritePreview"><img src="'+def.spriteUrl+'" alt=""><button type="button" id="f_spriteClear">Remove image</button></div>' : '') +
-      '</div>';
-      if(type==='character'){
-        html += '<div class="row2">' +
-          '<div class="field"><label>Sprite columns</label><input type="number" id="f_spriteCols" min="1" value="'+(def.spriteCols||2)+'"></div>' +
-          '<div class="field"><label>Sprite rows</label><input type="number" id="f_spriteRows" min="1" value="'+(def.spriteRows||2)+'"></div>' +
-        '</div>' +
-        '<p style="font-family:var(--sans);font-size:11px;color:var(--mist-dim);margin:-4px 0 12px;line-height:1.4;">' +
-        'For a walk animation, upload a sprite sheet and set how many columns/rows of frames it has - the Hero steps through one frame per move.</p>';
-      }
+    html += '<div class="field"><label>'+(type==='block' ? 'Texture image (optional)' : 'Sprite image (optional)')+'</label>' +
+      '<input type="file" id="f_sprite" accept="image/*">' +
+      (def.spriteUrl ? '<div class="spritePreview"><img src="'+def.spriteUrl+'" alt=""><button type="button" id="f_spriteClear">Remove image</button></div>' : '') +
+    '</div>';
+    if(type==='character'){
+      html += '<div class="row2">' +
+        '<div class="field"><label>Sprite columns</label><input type="number" id="f_spriteCols" min="1" value="'+(def.spriteCols||2)+'"></div>' +
+        '<div class="field"><label>Sprite rows</label><input type="number" id="f_spriteRows" min="1" value="'+(def.spriteRows||2)+'"></div>' +
+      '</div>' +
+      '<p style="font-family:var(--sans);font-size:11px;color:var(--mist-dim);margin:-4px 0 12px;line-height:1.4;">' +
+      'For a walk animation, upload a sprite sheet and set how many columns/rows of frames it has - the Hero steps through one frame per move.</p>';
     }
     if(type==='custom'){
       html += '<div class="field"><label>Custom properties</label><div class="customProps" id="customProps"></div>' +
@@ -1125,12 +1134,17 @@
     }
 
     terrainPaletteEl.innerHTML = '';
-    function makeSwatch(kind, name, color, isEntity){
+    function makeSwatch(kind, name, color, isEntity, spriteUrl){
       var sw = document.createElement('button');
       sw.type = 'button';
       var sel = (terrainBrushKind===kind && terrainBrushName===name);
       sw.className = 'terrainSwatch' + (isEntity ? ' entitySwatch' : '') + (sel ? ' selected' : '');
       sw.style.background = color;
+      if(spriteUrl){
+        sw.style.backgroundImage = 'url("'+spriteUrl+'")';
+        sw.style.backgroundSize = 'cover';
+        sw.style.backgroundPosition = 'center';
+      }
       sw.title = isEntity ? (name+' ('+TYPE_META[kind].label+')') : name;
       if(isEntity) sw.textContent = TYPE_META[kind].icon;
       sw.addEventListener('click', function(){
@@ -1140,8 +1154,8 @@
       });
       terrainPaletteEl.appendChild(sw);
     }
-    blockNames.forEach(function(nm){ makeSwatch('block', nm, resources.block[nm].color, false); });
-    entityList.forEach(function(e){ makeSwatch(e.kind, e.name, resources[e.kind][e.name].color, true); });
+    blockNames.forEach(function(nm){ makeSwatch('block', nm, resources.block[nm].color, false, resources.block[nm].spriteUrl); });
+    entityList.forEach(function(e){ makeSwatch(e.kind, e.name, resources[e.kind][e.name].color, true, resources[e.kind][e.name].spriteUrl); });
 
     var eraser = document.createElement('button');
     eraser.type = 'button';
@@ -1258,14 +1272,26 @@
         cell.className = 'terrainCell';
         cell.dataset.x = c; cell.dataset.y = r;
         var blockName = terrainState[r][c];
-        cell.style.background = (blockName && resources.block[blockName]) ? resources.block[blockName].color : '#1c1926';
+        var bdef = blockName ? resources.block[blockName] : null;
+        cell.style.background = bdef ? bdef.color : '#1c1926';
+        if(bdef && bdef.spriteUrl){
+          cell.style.backgroundImage = 'url("'+bdef.spriteUrl+'")';
+          cell.style.backgroundSize = 'cover';
+          cell.style.backgroundPosition = 'center';
+        }
         var ent = terrainEntityState.filter(function(e){ return e.x===c && e.y===r; })[0];
         if(ent){
           var badge = document.createElement('span');
           badge.className = 'cellEntity';
           var edef = resources[ent.kind] && resources[ent.kind][ent.name];
           badge.style.background = edef ? edef.color : '#888';
-          badge.textContent = TYPE_META[ent.kind].icon;
+          if(edef && edef.spriteUrl){
+            badge.style.backgroundImage = 'url("'+edef.spriteUrl+'")';
+            badge.style.backgroundSize = 'cover';
+            badge.style.backgroundPosition = 'center';
+          } else {
+            badge.textContent = TYPE_META[ent.kind].icon;
+          }
           cell.appendChild(badge);
         }
         terrainGridEl.appendChild(cell);
@@ -1418,7 +1444,13 @@
         cell.type = 'button';
         cell.className = 'pickCell' + (c===selX && r===selY ? ' selected' : '');
         var blockName = t.grid[r][c];
-        cell.style.background = (blockName && resources.block[blockName]) ? resources.block[blockName].color : '#1c1926';
+        var pdef = blockName ? resources.block[blockName] : null;
+        cell.style.background = pdef ? pdef.color : '#1c1926';
+        if(pdef && pdef.spriteUrl){
+          cell.style.backgroundImage = 'url("'+pdef.spriteUrl+'")';
+          cell.style.backgroundSize = 'cover';
+          cell.style.backgroundPosition = 'center';
+        }
         cell.addEventListener('click', (function(cx,cy){ return function(){ onPick(cx,cy); }; })(c,r));
         gridEl.appendChild(cell);
       }
