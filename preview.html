@@ -167,7 +167,9 @@
   #terrainGrid{ display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--ink);
     padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none;
     max-width:480px; width:100%; margin:0 auto; }
-  .terrainCell{ aspect-ratio:1; border-radius:2px; background:#1c1926; }
+  .terrainCell{ position:relative; aspect-ratio:1; border-radius:2px; background:#1c1926; }
+  .cellEntity{ position:absolute; inset:18%; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:9px; color:var(--ink); border:1px solid rgba(13,11,24,.5); pointer-events:none; }
   /* Everything you interact with lives down here, on purpose - the very top
      of the screen sits under the status bar / camera cutout on a lot of
      phones and isn't reliably tappable, so nothing important goes there. */
@@ -189,6 +191,7 @@
     background:var(--dusk-2);
     display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--mist); }
   .terrainSwatch.selected{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
+  .entitySwatch{ font-size:15px; color:var(--ink); font-weight:700; }
   #terrainLinkHint{ margin:0 0 10px; font-family:var(--sans); font-size:11px; line-height:1.4; color:var(--mist-dim); }
   #terrainLinkHint b{ color:var(--mist); font-weight:600; }
   #terrainError{ margin:0 0 10px; font-family:var(--sans); font-size:12px; color:var(--ember); }
@@ -1092,43 +1095,61 @@
   document.getElementById('exportBtn').addEventListener('click', openExport);
   document.getElementById('importBtn').addEventListener('click', openImport);
 
-  // ---------------- Terrain painter (visual alternative to typing setBlock calls) ----------------
+  // ---------------- Terrain painter (visual alternative to typing setBlock/addX calls) ----------------
   var terrainModalBg = document.getElementById('terrainModalBg');
   var terrainTabsEl = document.getElementById('terrainTabs');
   var terrainPaletteEl = document.getElementById('terrainPalette');
   var terrainGridEl = document.getElementById('terrainGrid');
-  var terrainState = null;        // COLS x ROWS array of block names (or null), live while the modal is open
-  var terrainBrush = null;        // selected block name, or null = eraser
+  var terrainState = null;         // COLS x ROWS array of block names (or null), live while the modal is open
+  var terrainEntityState = null;   // array of {kind,name,x,y} - Character/NPC/Mob placed via the painter
+  var terrainBrushKind = 'eraser'; // 'block' | 'character' | 'npc' | 'mob' | 'eraser'
+  var terrainBrushName = null;
   var terrainPainting = false;
   var activeEditTerrain = DEFAULT_TERRAIN;
+  var pendingEntityEdits = {};     // terrainName -> array, populated lazily per painter session
 
   function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   function renderTerrainPalette(){
     var blockNames = Object.keys(resources.block);
-    if(!blockNames.length || blockNames.indexOf(terrainBrush) === -1) terrainBrush = blockNames.length ? blockNames[0] : null;
+    var entityList = [];
+    ['character','npc','mob'].forEach(function(kind){
+      Object.keys(resources[kind]).forEach(function(nm){ entityList.push({ kind:kind, name:nm }); });
+    });
+
+    var brushValid = (terrainBrushKind==='block' && blockNames.indexOf(terrainBrushName)!==-1) ||
+      entityList.some(function(e){ return e.kind===terrainBrushKind && e.name===terrainBrushName; });
+    if(!brushValid){
+      if(blockNames.length){ terrainBrushKind='block'; terrainBrushName=blockNames[0]; }
+      else { terrainBrushKind='eraser'; terrainBrushName=null; }
+    }
 
     terrainPaletteEl.innerHTML = '';
-    blockNames.forEach(function(nm){
+    function makeSwatch(kind, name, color, isEntity){
       var sw = document.createElement('button');
       sw.type = 'button';
-      sw.className = 'terrainSwatch' + (nm===terrainBrush ? ' selected':'');
-      sw.style.background = resources.block[nm].color;
-      sw.title = nm;
+      var sel = (terrainBrushKind===kind && terrainBrushName===name);
+      sw.className = 'terrainSwatch' + (isEntity ? ' entitySwatch' : '') + (sel ? ' selected' : '');
+      sw.style.background = color;
+      sw.title = isEntity ? (name+' ('+TYPE_META[kind].label+')') : name;
+      if(isEntity) sw.textContent = TYPE_META[kind].icon;
       sw.addEventListener('click', function(){
-        terrainBrush = nm;
+        terrainBrushKind = kind; terrainBrushName = name;
         Array.prototype.forEach.call(terrainPaletteEl.children, function(c){ c.classList.remove('selected'); });
         sw.classList.add('selected');
       });
       terrainPaletteEl.appendChild(sw);
-    });
+    }
+    blockNames.forEach(function(nm){ makeSwatch('block', nm, resources.block[nm].color, false); });
+    entityList.forEach(function(e){ makeSwatch(e.kind, e.name, resources[e.kind][e.name].color, true); });
+
     var eraser = document.createElement('button');
     eraser.type = 'button';
-    eraser.className = 'terrainSwatch' + (terrainBrush===null ? ' selected':'');
+    eraser.className = 'terrainSwatch' + (terrainBrushKind==='eraser' ? ' selected':'');
     eraser.textContent = '\u2716';
     eraser.title = 'Eraser';
     eraser.addEventListener('click', function(){
-      terrainBrush = null;
+      terrainBrushKind = 'eraser'; terrainBrushName = null;
       Array.prototype.forEach.call(terrainPaletteEl.children, function(c){ c.classList.remove('selected'); });
       eraser.classList.add('selected');
     });
@@ -1177,15 +1198,33 @@
     loadTerrainIntoPainter(name);
   }
 
+  // Reads back whatever this painter previously wrote for this terrain's
+  // entities, so reopening it shows what's really there instead of nothing.
+  function parseManagedEntities(name){
+    var marker = new RegExp('// --- terrain-entities:'+escapeRegex(name)+':start ---([\\s\\S]*?)// --- terrain-entities:'+escapeRegex(name)+':end ---');
+    var m = codeInput.value.match(marker);
+    if(!m) return [];
+    var kindMap = { addCharacter:'character', addNPC:'npc', addMob:'mob' };
+    var callRe = /engine\.(addCharacter|addNPC|addMob)\(\s*["']([^"']*)["']\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*(?:,[^)]*)?\)/g;
+    var out = [], mm;
+    while((mm = callRe.exec(m[1]))){
+      out.push({ kind:kindMap[mm[1]], name:mm[2], x:Number(mm[3]), y:Number(mm[4]) });
+    }
+    return out;
+  }
+
   function loadTerrainIntoPainter(name){
     var t = ensureTerrain(name);
     terrainState = t.grid.map(function(row){ return row.slice(); });
+    if(!pendingEntityEdits[name]) pendingEntityEdits[name] = parseManagedEntities(name);
+    terrainEntityState = pendingEntityEdits[name];
     renderTerrainGrid();
   }
   function commitPainterState(){
     if(!terrainState) return;
     var t = ensureTerrain(activeEditTerrain);
     t.grid = terrainState.map(function(row){ return row.slice(); });
+    pendingEntityEdits[activeEditTerrain] = terrainEntityState;
   }
 
   function openTerrainPainter(createNew){
@@ -1193,6 +1232,7 @@
     activeEditTerrain = (activeEditTerrain && scene.terrains[activeEditTerrain]) ? activeEditTerrain
       : (scene.terrains[scene.active] ? scene.active : (names[0] || DEFAULT_TERRAIN));
     ensureTerrain(activeEditTerrain);
+    pendingEntityEdits = {};
 
     showTerrainError('');
     renderTerrainPalette();
@@ -1217,20 +1257,45 @@
         var cell = document.createElement('div');
         cell.className = 'terrainCell';
         cell.dataset.x = c; cell.dataset.y = r;
-        paintCellVisual(cell, terrainState[r][c]);
+        var blockName = terrainState[r][c];
+        cell.style.background = (blockName && resources.block[blockName]) ? resources.block[blockName].color : '#1c1926';
+        var ent = terrainEntityState.filter(function(e){ return e.x===c && e.y===r; })[0];
+        if(ent){
+          var badge = document.createElement('span');
+          badge.className = 'cellEntity';
+          var edef = resources[ent.kind] && resources[ent.kind][ent.name];
+          badge.style.background = edef ? edef.color : '#888';
+          badge.textContent = TYPE_META[ent.kind].icon;
+          cell.appendChild(badge);
+        }
         terrainGridEl.appendChild(cell);
       }
     }
   }
-  function paintCellVisual(cell, blockName){
-    cell.style.background = (blockName && resources.block[blockName]) ? resources.block[blockName].color : '#1c1926';
+
+  function applyBrush(x, y){
+    if(terrainBrushKind === 'eraser'){
+      terrainState[y][x] = null;
+      terrainEntityState = terrainEntityState.filter(function(e){ return !(e.x===x && e.y===y); });
+    } else if(terrainBrushKind === 'block'){
+      terrainState[y][x] = terrainBrushName;
+    } else {
+      // Character is singular - placing it anywhere replaces its one spot.
+      // NPC/Mob can repeat, so only the exact cell being painted is claimed.
+      if(terrainBrushKind === 'character'){
+        terrainEntityState = terrainEntityState.filter(function(e){ return e.kind!=='character'; });
+      } else {
+        terrainEntityState = terrainEntityState.filter(function(e){ return !(e.x===x && e.y===y); });
+      }
+      terrainEntityState.push({ kind:terrainBrushKind, name:terrainBrushName, x:x, y:y });
+    }
+    renderTerrainGrid();
   }
   function paintAt(clientX, clientY){
     var el = document.elementFromPoint(clientX, clientY);
-    if(!el || !el.classList || !el.classList.contains('terrainCell')) return;
-    var x = Number(el.dataset.x), y = Number(el.dataset.y);
-    terrainState[y][x] = terrainBrush;
-    paintCellVisual(el, terrainBrush);
+    var cell = el && el.closest ? el.closest('.terrainCell') : null;
+    if(!cell) return;
+    applyBrush(Number(cell.dataset.x), Number(cell.dataset.y));
   }
   terrainGridEl.addEventListener('touchstart', function(e){ terrainPainting=true; paintAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
   terrainGridEl.addEventListener('touchmove', function(e){ if(!terrainPainting) return; paintAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
@@ -1239,7 +1304,7 @@
   terrainGridEl.addEventListener('mousemove', function(e){ if(!terrainPainting) return; paintAt(e.clientX,e.clientY); });
   window.addEventListener('mouseup', function(){ terrainPainting=false; });
 
-  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); terrainState = null; }
+  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); terrainState = null; terrainEntityState = null; }
   document.getElementById('terrainCancelBtn').addEventListener('click', closeTerrainPainter);
   terrainModalBg.addEventListener('click', function(e){ if(e.target===terrainModalBg) closeTerrainPainter(); });
 
@@ -1261,10 +1326,43 @@
     }
   }
 
+  // Removes any existing engine.addX("Name", ...) statement(s) so placing an
+  // entity through the painter can't leave a duplicate behind - whether the
+  // old one was hand-typed or from a previous painter session.
+  function reconcileEntityLine(kind, name, x, y){
+    var fnName = 'add'+cap(kind);
+    var re = new RegExp('[ \\t]*engine\\.'+fnName+'\\(\\s*["\']'+escapeRegex(name)+'["\']\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)[^\\n]*\\)\\s*;?[ \\t]*\\n?', 'g');
+    var onlyExact = (kind !== 'character');
+    codeInput.value = codeInput.value.replace(re, function(full, xStr, yStr){
+      if(!onlyExact) return '';
+      return (Number(xStr)===x && Number(yStr)===y) ? '' : full;
+    });
+  }
+
+  function writeTerrainEntitiesBlock(name, entities){
+    entities.forEach(function(e){ reconcileEntityLine(e.kind, e.name, e.x, e.y); });
+    var lines = ['// --- terrain-entities:'+name+':start ---'];
+    entities.forEach(function(e){
+      lines.push('engine.add'+cap(e.kind)+'("'+e.name+'", '+e.x+', '+e.y+', "'+name+'");');
+    });
+    lines.push('// --- terrain-entities:'+name+':end ---');
+    var block = lines.join('\n');
+    var marker = new RegExp('// --- terrain-entities:'+escapeRegex(name)+':start ---[\\s\\S]*?// --- terrain-entities:'+escapeRegex(name)+':end ---');
+    if(marker.test(codeInput.value)){
+      codeInput.value = codeInput.value.replace(marker, block);
+    } else {
+      var sep = (codeInput.value.length && !/\n$/.test(codeInput.value)) ? '\n' : '';
+      codeInput.value = codeInput.value + sep + block + '\n';
+    }
+  }
+
   document.getElementById('terrainDoneBtn').addEventListener('click', function(){
     commitPainterState();
     Object.keys(scene.terrains).forEach(function(name){
       writeTerrainCodeBlock(name, scene.terrains[name].grid);
+    });
+    Object.keys(pendingEntityEdits).forEach(function(name){
+      writeTerrainEntitiesBlock(name, pendingEntityEdits[name]);
     });
     closeTerrainPainter();
     runCode();

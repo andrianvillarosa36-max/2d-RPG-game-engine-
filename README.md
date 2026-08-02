@@ -118,8 +118,14 @@ Two layers, on purpose:
 
 Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
 fast. **+ Terrain** (and **Edit Terrain** — same tool) opens a full-screen
-painter: the grid is up top, and the tabs, block palette, and Cancel/Done
-buttons all live in a panel anchored to the **bottom** of the screen.
+painter: the grid is up top, and the tabs, palette, and Cancel/Done buttons
+all live in a panel anchored to the **bottom** of the screen. The palette
+isn't just blocks — every Character, NPC, and Mob resource shows up there
+too (with its kind icon on the swatch), so placing Hero, an NPC, or a mob
+is the same tap-to-place motion as painting Grass, not a separate step in
+the code. Anything new you create with **+ Block** / **+ Character** /
+**+ NPC** / **+ Mob** appears here automatically, same as it always did
+for blocks - there's nothing extra to wire up.
 
 **Why the bottom:** the first version pinned those controls near the top,
 which turned out to sit right under the status bar / camera cutout on a
@@ -146,6 +152,19 @@ itself, pre-filled with a suggested name when you tap **+ Terrain**. Every
 other popup (`alert()`) in the editor got replaced the same way, with a
 message that appears in the modal instead of a dialog that may not have
 been showing at all.
+
+**Placing Character/NPC/Mob through the painter won't duplicate one you
+already have.** Tapping a cell with an entity brush selected doesn't just
+add a call to your script blindly — it actively removes any existing
+placement of that same entity first. For **Character** specifically, that
+means *anywhere* in your script, since there's only ever meant to be one
+Hero; moving it through the painter cleans up the old spot automatically.
+For **NPC and Mob**, only an exact position match gets replaced, so you
+can still have five different Slimes scattered around — placing a sixth
+doesn't touch the other five. Reopening the painter also reads back
+whatever it placed last time (it's the only thing that ever manages that
+part of your script), so your existing NPCs and Mobs show up already
+there instead of looking like they vanished.
 
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own
