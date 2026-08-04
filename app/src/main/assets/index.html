@@ -134,6 +134,11 @@
   /* ---------- Play mode (fullscreen + landscape) ---------- */
   body.playMode #toolbar, body.playMode #palette, body.playMode #editorPane{ display:none; }
   body.playMode #previewPane{ flex:1 1 auto; border-bottom:none; min-height:0; }
+  body.standaloneGame #exitPlayBtn{ display:none; }
+  #editThisGameBtn{ display:none; margin-left:auto; background:transparent; border:1px solid var(--rune);
+    color:var(--mist-dim); font-family:var(--mono); font-size:10px; letter-spacing:.04em;
+    text-transform:uppercase; padding:4px 8px; border-radius:4px; }
+  body.standaloneGame #editThisGameBtn{ display:inline-block; }
   body.playMode #canvasWrap{ flex:1 1 auto; min-height:0; }
   body.playMode #gameCanvas{ width:100%; height:100%; object-fit:contain; }
   /* Bottom-anchored, not top - the top edge sits under the status bar /
@@ -142,6 +147,34 @@
     width:38px; height:38px; border-radius:50%; background:rgba(13,11,24,.75); color:var(--mist);
     border:1px solid var(--rune); font-size:14px; align-items:center; justify-content:center; }
   body.playMode #exitPlayBtn{ display:flex; }
+
+  /* Top-right: the bottom row is already joystick + attack + exit, so the
+     bag lives up top. Occasional-use control, unlike exit, so the small
+     camera-cutout risk up there is an acceptable trade-off here. */
+  #bagBtn{ display:none; position:absolute; top:10px; right:10px; z-index:8;
+    width:34px; height:34px; border-radius:50%; background:rgba(13,11,24,.75); color:var(--mist);
+    border:1px solid var(--rune); font-size:16px; align-items:center; justify-content:center; }
+  body.playMode #bagBtn{ display:flex; }
+  #bagBtn .count{ position:absolute; bottom:-4px; right:-4px; background:var(--gold); color:var(--ink);
+    font-family:var(--mono); font-size:10px; line-height:1; border-radius:8px; padding:2px 4px; min-width:12px; }
+
+  #bagModalBg{ position:fixed; inset:0; background:rgba(6,5,12,.65); display:none;
+    align-items:flex-end; justify-content:center; z-index:50; }
+  #bagModalBg.show{ display:flex; }
+  #bagModal{ width:100%; max-width:480px; max-height:70vh; overflow-y:auto; background:var(--dusk);
+    border:1px solid var(--rune); border-radius:16px 16px 0 0; padding:16px;
+    box-shadow:0 0 0 2px var(--gold) inset; box-sizing:border-box; }
+  #bagList{ display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+  .bagItem{ display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.04);
+    border:1px solid var(--rune); border-radius:10px; padding:8px 10px; text-align:left; width:100%;
+    font-family:var(--sans); color:var(--mist); }
+  .bagItem img{ width:28px; height:28px; object-fit:cover; image-rendering:pixelated; border-radius:4px; flex:none; }
+  .bagItem .sw{ width:28px; height:28px; border-radius:4px; flex:none; }
+  .bagItem .info{ flex:1; text-align:left; }
+  .bagItem .info b{ display:block; font-size:13px; }
+  .bagItem .info span{ display:block; font-size:11px; color:var(--mist-dim); margin-top:2px; }
+  .bagItem .count{ font-family:var(--mono); font-size:12px; color:var(--mist-dim); }
+  #bagEmpty{ font-family:var(--sans); font-size:12px; color:var(--mist-dim); text-align:center; padding:24px 0; }
 
   /* ---------- Interact / Attack button ---------- */
   #actionBtn{ display:none; position:absolute; right:14px; bottom:14px; z-index:5;
@@ -167,9 +200,7 @@
   #terrainGrid{ display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--ink);
     padding:4px; border-radius:6px; touch-action:none; user-select:none; -webkit-user-select:none;
     max-width:480px; width:100%; margin:0 auto; }
-  .terrainCell{ position:relative; aspect-ratio:1; border-radius:2px; background:#1c1926; }
-  .cellEntity{ position:absolute; inset:18%; border-radius:50%; display:flex; align-items:center;
-    justify-content:center; font-size:9px; color:var(--ink); border:1px solid rgba(13,11,24,.5); pointer-events:none; }
+  .terrainCell{ aspect-ratio:1; border-radius:2px; background:#1c1926; }
   /* Everything you interact with lives down here, on purpose - the very top
      of the screen sits under the status bar / camera cutout on a lot of
      phones and isn't reliably tappable, so nothing important goes there. */
@@ -191,7 +222,6 @@
     background:var(--dusk-2);
     display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--mist); }
   .terrainSwatch.selected{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold); }
-  .entitySwatch{ font-size:15px; color:var(--ink); font-weight:700; }
   #terrainLinkHint{ margin:0 0 10px; font-family:var(--sans); font-size:11px; line-height:1.4; color:var(--mist-dim); }
   #terrainLinkHint b{ color:var(--mist); font-weight:600; }
   #terrainError{ margin:0 0 10px; font-family:var(--sans); font-size:12px; color:var(--ember); }
@@ -240,11 +270,13 @@
       <span class="live"><span class="dot"></span>Live Preview</span>
       <span id="hudInfo"></span>
       <span id="gridInfo"></span>
+      <button id="editThisGameBtn" type="button" style="display:none;">Edit this game</button>
     </div>
     <div id="canvasWrap">
       <canvas id="gameCanvas"></canvas>
       <div id="padWrap"><div id="joyBase"><div id="joyNub"></div></div></div>
       <button id="actionBtn" type="button"><span class="glyph">&#9876;</span><span class="txt">Attack</span></button>
+      <button id="bagBtn" type="button" title="Inventory"><span class="glyph">&#127890;</span></button>
       <button id="exitPlayBtn" type="button" title="Exit play mode">&#10005;</button>
     </div>
   </div>
@@ -267,6 +299,7 @@
     <button class="tbtn" id="connectorEditBtn" type="button">Edit Terrain Connector</button>
     <button class="tbtn io" id="exportBtn" type="button">Export</button>
     <button class="tbtn io" id="importBtn" type="button">Import</button>
+    <button class="tbtn io" id="exportGameBtn" type="button">Export Game (HTML)</button>
   </div>
 
   <div id="palette"></div>
@@ -354,9 +387,24 @@
   </div>
 </div>
 
+<div id="bagModalBg">
+  <div id="bagModal">
+    <h3 style="margin:0 0 8px;font-family:var(--mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);">Bag</h3>
+    <div id="bagList"></div>
+    <div id="bagEmpty" style="display:none;">Nothing collected yet - walk into an Item to pick it up.</div>
+    <div class="modalBtns">
+      <button id="bagCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
+
+  // Replaced by exportGameHtml() when producing a standalone game file.
+  // Left as null, this file behaves exactly like the normal editor.
+  var EXPORTED_GAME = null;
 
   var HERO_ATTACK_DAMAGE = 25;
   var MOB_ATTACK_DAMAGE = 10;
@@ -458,24 +506,26 @@
     document.getElementById('gridInfo').textContent = scene.active + ' \u00B7 ' + COLS + '\u00D7' + ROWS;
     var t = currentTerrain();
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = "#241d3f";
+    for(var x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,ROWS*CELL); ctx.stroke(); }
+    for(var y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(COLS*CELL,y*CELL); ctx.stroke(); }
 
     for(var r=0;r<ROWS;r++){
       for(var c=0;c<COLS;c++){
         var name = t.grid[r][c];
         if(!name) continue;
         var def = resources.block[name];
-        var bx = c*CELL, by = r*CELL, bw = CELL, bh = CELL;
-        var textured = false;
-        if(def && def.spriteUrl){
+        var drewSprite = false;
+        if (def && def.spriteUrl) {
           var bimg = getSpriteImage(def.spriteUrl);
-          if(bimg.complete && bimg.naturalWidth){
-            ctx.drawImage(bimg, bx, by, bw, bh);
-            textured = true;
+          if (bimg.complete && bimg.naturalWidth) {
+            ctx.drawImage(bimg, c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+            drewSprite = true;
           }
         }
-        if(!textured){
+        if (!drewSprite) {
           ctx.fillStyle = def ? def.color : "#555";
-          ctx.fillRect(bx, by, bw, bh);
+          ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
         }
         if (def && def.solid) {
           ctx.strokeStyle = 'rgba(13,11,24,.55)';
@@ -546,11 +596,77 @@
   function updateHud(){
     var hero = findHero();
     var hud = document.getElementById('hudInfo');
+    updateBagBadge();
     if (!hero || hero.maxHealth == null) { hud.textContent=''; hud.style.color=''; return; }
     var hp = Math.max(0, hero.health), max = hero.maxHealth;
     hud.textContent = 'HP ' + hp + '/' + max;
     hud.style.color = (hp <= max*0.3) ? 'var(--ember)' : '';
   }
+
+  // ---------------- Inventory ----------------
+  function parseHealthEffect(effect){
+    if(!effect) return null;
+    var m = /^\s*([+-]?\d+)\s*health\s*$/i.exec(effect);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  function updateBagBadge(){
+    var hero = findHero();
+    var inv = (hero && hero.inventory) || [];
+    var total = inv.reduce(function(sum,it){ return sum+it.count; }, 0);
+    var btn = document.getElementById('bagBtn');
+    var existing = btn.querySelector('.count');
+    if(total>0){
+      if(!existing){ existing = document.createElement('span'); existing.className='count'; btn.appendChild(existing); }
+      existing.textContent = total;
+    } else if(existing){
+      existing.remove();
+    }
+  }
+  function renderBag(){
+    var hero = findHero();
+    var inv = (hero && hero.inventory) || [];
+    var list = document.getElementById('bagList');
+    var empty = document.getElementById('bagEmpty');
+    list.innerHTML = '';
+    empty.style.display = inv.length ? 'none' : 'block';
+    inv.forEach(function(it, idx){
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'bagItem';
+      var thumb = it.spriteUrl
+        ? '<img src="'+it.spriteUrl+'" alt="">'
+        : '<span class="sw" style="background:'+(it.color||'#888')+'"></span>';
+      row.innerHTML = thumb +
+        '<span class="info"><b></b><span></span></span>' +
+        '<span class="count">x'+it.count+'</span>';
+      row.querySelector('b').textContent = it.name;
+      row.querySelector('.info span').textContent = it.effect || 'Tap to use';
+      row.addEventListener('click', function(){ useItem(idx); });
+      list.appendChild(row);
+    });
+  }
+  function useItem(idx){
+    var hero = findHero();
+    if(!hero || !hero.inventory || !hero.inventory[idx]) return;
+    var it = hero.inventory[idx];
+    var healAmt = parseHealthEffect(it.effect);
+    if(healAmt != null && hero.health != null){
+      hero.health = hero.maxHealth ? Math.min(hero.maxHealth, hero.health + healAmt) : hero.health + healAmt;
+      setStatus('Used '+it.name+' ('+(healAmt>=0?'+':'')+healAmt+' health).', false);
+    } else if(it.effect){
+      setStatus('Used '+it.name+': '+it.effect, false);
+    } else {
+      setStatus('Used '+it.name+'.', false);
+    }
+    it.count--;
+    if(it.count<=0) hero.inventory.splice(idx,1);
+    updateHud(); renderBag();
+  }
+  function openBag(){ renderBag(); document.getElementById('bagModalBg').classList.add('show'); }
+  function closeBag(){ document.getElementById('bagModalBg').classList.remove('show'); }
+  document.getElementById('bagBtn').addEventListener('click', openBag);
+  document.getElementById('bagCloseBtn').addEventListener('click', closeBag);
+  document.getElementById('bagModalBg').addEventListener('click', function(e){ if(e.target.id==='bagModalBg') closeBag(); });
 
   // ---------------- Scripting engine API (what the user's code talks to) ----------------
   function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
@@ -650,6 +766,20 @@
   }
   document.getElementById('exitPlayBtn').addEventListener('click', exitPlayMode);
 
+  // Recovery path for exactly the mistake of shipping an exported game.html
+  // as the editor's own index.html: everything the editor needs (resources,
+  // script) is already sitting in memory from the EXPORTED_GAME boot, so
+  // "editing" just means turning the chrome back on - no reload, no file
+  // changes, no re-push needed.
+  function promoteToEditor(){
+    EXPORTED_GAME = null;
+    document.body.classList.remove('standaloneGame');
+    exitPlayMode();
+    refreshPalette();
+    setStatus('Now editing. This only changes what you see right now - to fix it permanently, replace this build\'s index.html/preview.html with the real editor files.', false);
+  }
+  document.getElementById('editThisGameBtn').addEventListener('click', promoteToEditor);
+
   // ---------------- Movement / collision / combat ----------------
   function performAttack(hero, mob){
     var t = currentTerrain();
@@ -704,7 +834,11 @@
     var item = t.entities.find(function(e){ return e.kind==='item' && e.x===nx && e.y===ny; });
     if(item){
       t.entities = t.entities.filter(function(e){ return e!==item; });
-      setStatus('Picked up '+item.name+(item.effect?' ('+item.effect+')':'')+'!', false);
+      hero.inventory = hero.inventory || [];
+      var stack = hero.inventory.find(function(it){ return it.name===item.name; });
+      if(stack){ stack.count++; }
+      else { hero.inventory.push({ name:item.name, count:1, color:item.color, spriteUrl:item.spriteUrl, effect:item.effect }); }
+      setStatus('Picked up '+item.name+(item.effect?' ('+item.effect+')':'')+'! In bag now.', false);
     }
 
     hero.x = nx; hero.y = ny;
@@ -878,7 +1012,7 @@
     if(type==='item'){
       html += '<div class="field"><label>Effect</label><input type="text" id="f_effect" value="'+escapeHtml(def.effect||'')+'" placeholder="e.g. +10 health"></div>';
     }
-    html += '<div class="field"><label>'+(type==='block' ? 'Texture image (optional)' : 'Sprite image (optional)')+'</label>' +
+    html += '<div class="field"><label>Sprite image (optional)</label>' +
       '<input type="file" id="f_sprite" accept="image/*">' +
       (def.spriteUrl ? '<div class="spritePreview"><img src="'+def.spriteUrl+'" alt=""><button type="button" id="f_spriteClear">Remove image</button></div>' : '') +
     '</div>';
@@ -1101,66 +1235,99 @@
   document.getElementById('exportBtn').addEventListener('click', openExport);
   document.getElementById('importBtn').addEventListener('click', openImport);
 
-  // ---------------- Terrain painter (visual alternative to typing setBlock/addX calls) ----------------
+  // ---------------- Export Game (standalone playable HTML) ----------------
+  // Turns the current project into a self-contained file: this same app,
+  // with EXPORTED_GAME baked in so it loads straight into Play mode with
+  // no editor chrome. Dropped into a copy of this project's
+  // app/src/main/assets/index.html, it builds into a real APK through the
+  // same GitHub Actions workflow this project already uses - a WebView
+  // can't invoke a compiler itself, so that last step still has to happen
+  // outside the app, same as it does for the editor APK you already build.
+  function exportGameHtml(){
+    var marker = 'var EXPORTED_GAME = null;';
+    var payload;
+    try{
+      payload = JSON.stringify({ resources: resources, script: codeInput.value })
+        .replace(/<\/script/gi, '<\\/script');
+    }catch(e){
+      setStatus('Export failed: could not serialise the project (' + e.message + ').', true);
+      return;
+    }
+    setStatus('Exporting...', false);
+    fetch(location.href).then(function(res){
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    }).then(function(sourceHtml){
+      if(sourceHtml.indexOf(marker) === -1){
+        throw new Error('marker not found - the source file may have been edited since this build');
+      }
+      var injected = sourceHtml.replace(marker, 'var EXPORTED_GAME = ' + payload + ';');
+      var blob = new Blob([injected], { type: 'text/html' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'game.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      setStatus('Exported game.html - see README "Turning an exported game into an APK" for the next step.', false);
+    }).catch(function(err){
+      setStatus('Export failed: could not read this page\'s own source (' + err.message + '). ' +
+        'If this happens inside the installed app, try opening preview.html in a regular browser tab instead - some WebView configurations restrict a page from reading its own file.', true);
+    });
+  }
+  document.getElementById('exportGameBtn').addEventListener('click', exportGameHtml);
+
+  // ---------------- Terrain painter (visual alternative to typing setBlock calls) ----------------
   var terrainModalBg = document.getElementById('terrainModalBg');
   var terrainTabsEl = document.getElementById('terrainTabs');
   var terrainPaletteEl = document.getElementById('terrainPalette');
   var terrainGridEl = document.getElementById('terrainGrid');
-  var terrainState = null;         // COLS x ROWS array of block names (or null), live while the modal is open
-  var terrainEntityState = null;   // array of {kind,name,x,y} - Character/NPC/Mob placed via the painter
-  var terrainBrushKind = 'eraser'; // 'block' | 'character' | 'npc' | 'mob' | 'eraser'
-  var terrainBrushName = null;
+  var terrainState = null;        // COLS x ROWS array of block names (or null), live while the modal is open
+  var terrainBrush = null;        // selected block name, or null = eraser
   var terrainPainting = false;
   var activeEditTerrain = DEFAULT_TERRAIN;
-  var pendingEntityEdits = {};     // terrainName -> array, populated lazily per painter session
 
   function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+  function applyBlockSwatchStyle(el, def){
+    if(def && def.spriteUrl){
+      el.style.backgroundImage = 'url(' + def.spriteUrl + ')';
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.style.backgroundColor = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.style.backgroundColor = def ? def.color : '#1c1926';
+    }
+  }
+
   function renderTerrainPalette(){
     var blockNames = Object.keys(resources.block);
-    var entityList = [];
-    ['character','npc','mob'].forEach(function(kind){
-      Object.keys(resources[kind]).forEach(function(nm){ entityList.push({ kind:kind, name:nm }); });
-    });
-
-    var brushValid = (terrainBrushKind==='block' && blockNames.indexOf(terrainBrushName)!==-1) ||
-      entityList.some(function(e){ return e.kind===terrainBrushKind && e.name===terrainBrushName; });
-    if(!brushValid){
-      if(blockNames.length){ terrainBrushKind='block'; terrainBrushName=blockNames[0]; }
-      else { terrainBrushKind='eraser'; terrainBrushName=null; }
-    }
+    if(!blockNames.length || blockNames.indexOf(terrainBrush) === -1) terrainBrush = blockNames.length ? blockNames[0] : null;
 
     terrainPaletteEl.innerHTML = '';
-    function makeSwatch(kind, name, color, isEntity, spriteUrl){
+    blockNames.forEach(function(nm){
       var sw = document.createElement('button');
       sw.type = 'button';
-      var sel = (terrainBrushKind===kind && terrainBrushName===name);
-      sw.className = 'terrainSwatch' + (isEntity ? ' entitySwatch' : '') + (sel ? ' selected' : '');
-      sw.style.background = color;
-      if(spriteUrl){
-        sw.style.backgroundImage = 'url("'+spriteUrl+'")';
-        sw.style.backgroundSize = 'cover';
-        sw.style.backgroundPosition = 'center';
-      }
-      sw.title = isEntity ? (name+' ('+TYPE_META[kind].label+')') : name;
-      if(isEntity) sw.textContent = TYPE_META[kind].icon;
+      sw.className = 'terrainSwatch' + (nm===terrainBrush ? ' selected':'');
+      applyBlockSwatchStyle(sw, resources.block[nm]);
+      sw.title = nm;
       sw.addEventListener('click', function(){
-        terrainBrushKind = kind; terrainBrushName = name;
+        terrainBrush = nm;
         Array.prototype.forEach.call(terrainPaletteEl.children, function(c){ c.classList.remove('selected'); });
         sw.classList.add('selected');
       });
       terrainPaletteEl.appendChild(sw);
-    }
-    blockNames.forEach(function(nm){ makeSwatch('block', nm, resources.block[nm].color, false, resources.block[nm].spriteUrl); });
-    entityList.forEach(function(e){ makeSwatch(e.kind, e.name, resources[e.kind][e.name].color, true, resources[e.kind][e.name].spriteUrl); });
-
+    });
     var eraser = document.createElement('button');
     eraser.type = 'button';
-    eraser.className = 'terrainSwatch' + (terrainBrushKind==='eraser' ? ' selected':'');
+    eraser.className = 'terrainSwatch' + (terrainBrush===null ? ' selected':'');
     eraser.textContent = '\u2716';
     eraser.title = 'Eraser';
     eraser.addEventListener('click', function(){
-      terrainBrushKind = 'eraser'; terrainBrushName = null;
+      terrainBrush = null;
       Array.prototype.forEach.call(terrainPaletteEl.children, function(c){ c.classList.remove('selected'); });
       eraser.classList.add('selected');
     });
@@ -1209,33 +1376,15 @@
     loadTerrainIntoPainter(name);
   }
 
-  // Reads back whatever this painter previously wrote for this terrain's
-  // entities, so reopening it shows what's really there instead of nothing.
-  function parseManagedEntities(name){
-    var marker = new RegExp('// --- terrain-entities:'+escapeRegex(name)+':start ---([\\s\\S]*?)// --- terrain-entities:'+escapeRegex(name)+':end ---');
-    var m = codeInput.value.match(marker);
-    if(!m) return [];
-    var kindMap = { addCharacter:'character', addNPC:'npc', addMob:'mob' };
-    var callRe = /engine\.(addCharacter|addNPC|addMob)\(\s*["']([^"']*)["']\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*(?:,[^)]*)?\)/g;
-    var out = [], mm;
-    while((mm = callRe.exec(m[1]))){
-      out.push({ kind:kindMap[mm[1]], name:mm[2], x:Number(mm[3]), y:Number(mm[4]) });
-    }
-    return out;
-  }
-
   function loadTerrainIntoPainter(name){
     var t = ensureTerrain(name);
     terrainState = t.grid.map(function(row){ return row.slice(); });
-    if(!pendingEntityEdits[name]) pendingEntityEdits[name] = parseManagedEntities(name);
-    terrainEntityState = pendingEntityEdits[name];
     renderTerrainGrid();
   }
   function commitPainterState(){
     if(!terrainState) return;
     var t = ensureTerrain(activeEditTerrain);
     t.grid = terrainState.map(function(row){ return row.slice(); });
-    pendingEntityEdits[activeEditTerrain] = terrainEntityState;
   }
 
   function openTerrainPainter(createNew){
@@ -1243,7 +1392,6 @@
     activeEditTerrain = (activeEditTerrain && scene.terrains[activeEditTerrain]) ? activeEditTerrain
       : (scene.terrains[scene.active] ? scene.active : (names[0] || DEFAULT_TERRAIN));
     ensureTerrain(activeEditTerrain);
-    pendingEntityEdits = {};
 
     showTerrainError('');
     renderTerrainPalette();
@@ -1268,57 +1416,20 @@
         var cell = document.createElement('div');
         cell.className = 'terrainCell';
         cell.dataset.x = c; cell.dataset.y = r;
-        var blockName = terrainState[r][c];
-        var bdef = blockName ? resources.block[blockName] : null;
-        cell.style.background = bdef ? bdef.color : '#1c1926';
-        if(bdef && bdef.spriteUrl){
-          cell.style.backgroundImage = 'url("'+bdef.spriteUrl+'")';
-          cell.style.backgroundSize = 'cover';
-          cell.style.backgroundPosition = 'center';
-        }
-        var ent = terrainEntityState.filter(function(e){ return e.x===c && e.y===r; })[0];
-        if(ent){
-          var badge = document.createElement('span');
-          badge.className = 'cellEntity';
-          var edef = resources[ent.kind] && resources[ent.kind][ent.name];
-          badge.style.background = edef ? edef.color : '#888';
-          if(edef && edef.spriteUrl){
-            badge.style.backgroundImage = 'url("'+edef.spriteUrl+'")';
-            badge.style.backgroundSize = 'cover';
-            badge.style.backgroundPosition = 'center';
-          } else {
-            badge.textContent = TYPE_META[ent.kind].icon;
-          }
-          cell.appendChild(badge);
-        }
+        paintCellVisual(cell, terrainState[r][c]);
         terrainGridEl.appendChild(cell);
       }
     }
   }
-
-  function applyBrush(x, y){
-    if(terrainBrushKind === 'eraser'){
-      terrainState[y][x] = null;
-      terrainEntityState = terrainEntityState.filter(function(e){ return !(e.x===x && e.y===y); });
-    } else if(terrainBrushKind === 'block'){
-      terrainState[y][x] = terrainBrushName;
-    } else {
-      // Character is singular - placing it anywhere replaces its one spot.
-      // NPC/Mob can repeat, so only the exact cell being painted is claimed.
-      if(terrainBrushKind === 'character'){
-        terrainEntityState = terrainEntityState.filter(function(e){ return e.kind!=='character'; });
-      } else {
-        terrainEntityState = terrainEntityState.filter(function(e){ return !(e.x===x && e.y===y); });
-      }
-      terrainEntityState.push({ kind:terrainBrushKind, name:terrainBrushName, x:x, y:y });
-    }
-    renderTerrainGrid();
+  function paintCellVisual(cell, blockName){
+    applyBlockSwatchStyle(cell, (blockName && resources.block[blockName]) ? resources.block[blockName] : null);
   }
   function paintAt(clientX, clientY){
     var el = document.elementFromPoint(clientX, clientY);
-    var cell = el && el.closest ? el.closest('.terrainCell') : null;
-    if(!cell) return;
-    applyBrush(Number(cell.dataset.x), Number(cell.dataset.y));
+    if(!el || !el.classList || !el.classList.contains('terrainCell')) return;
+    var x = Number(el.dataset.x), y = Number(el.dataset.y);
+    terrainState[y][x] = terrainBrush;
+    paintCellVisual(el, terrainBrush);
   }
   terrainGridEl.addEventListener('touchstart', function(e){ terrainPainting=true; paintAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
   terrainGridEl.addEventListener('touchmove', function(e){ if(!terrainPainting) return; paintAt(e.touches[0].clientX,e.touches[0].clientY); e.preventDefault(); }, {passive:false});
@@ -1327,7 +1438,7 @@
   terrainGridEl.addEventListener('mousemove', function(e){ if(!terrainPainting) return; paintAt(e.clientX,e.clientY); });
   window.addEventListener('mouseup', function(){ terrainPainting=false; });
 
-  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); terrainState = null; terrainEntityState = null; }
+  function closeTerrainPainter(){ terrainModalBg.classList.remove('open'); terrainState = null; }
   document.getElementById('terrainCancelBtn').addEventListener('click', closeTerrainPainter);
   terrainModalBg.addEventListener('click', function(e){ if(e.target===terrainModalBg) closeTerrainPainter(); });
 
@@ -1349,43 +1460,10 @@
     }
   }
 
-  // Removes any existing engine.addX("Name", ...) statement(s) so placing an
-  // entity through the painter can't leave a duplicate behind - whether the
-  // old one was hand-typed or from a previous painter session.
-  function reconcileEntityLine(kind, name, x, y){
-    var fnName = 'add'+cap(kind);
-    var re = new RegExp('[ \\t]*engine\\.'+fnName+'\\(\\s*["\']'+escapeRegex(name)+'["\']\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)[^\\n]*\\)\\s*;?[ \\t]*\\n?', 'g');
-    var onlyExact = (kind !== 'character');
-    codeInput.value = codeInput.value.replace(re, function(full, xStr, yStr){
-      if(!onlyExact) return '';
-      return (Number(xStr)===x && Number(yStr)===y) ? '' : full;
-    });
-  }
-
-  function writeTerrainEntitiesBlock(name, entities){
-    entities.forEach(function(e){ reconcileEntityLine(e.kind, e.name, e.x, e.y); });
-    var lines = ['// --- terrain-entities:'+name+':start ---'];
-    entities.forEach(function(e){
-      lines.push('engine.add'+cap(e.kind)+'("'+e.name+'", '+e.x+', '+e.y+', "'+name+'");');
-    });
-    lines.push('// --- terrain-entities:'+name+':end ---');
-    var block = lines.join('\n');
-    var marker = new RegExp('// --- terrain-entities:'+escapeRegex(name)+':start ---[\\s\\S]*?// --- terrain-entities:'+escapeRegex(name)+':end ---');
-    if(marker.test(codeInput.value)){
-      codeInput.value = codeInput.value.replace(marker, block);
-    } else {
-      var sep = (codeInput.value.length && !/\n$/.test(codeInput.value)) ? '\n' : '';
-      codeInput.value = codeInput.value + sep + block + '\n';
-    }
-  }
-
   document.getElementById('terrainDoneBtn').addEventListener('click', function(){
     commitPainterState();
     Object.keys(scene.terrains).forEach(function(name){
       writeTerrainCodeBlock(name, scene.terrains[name].grid);
-    });
-    Object.keys(pendingEntityEdits).forEach(function(name){
-      writeTerrainEntitiesBlock(name, pendingEntityEdits[name]);
     });
     closeTerrainPainter();
     runCode();
@@ -1441,13 +1519,7 @@
         cell.type = 'button';
         cell.className = 'pickCell' + (c===selX && r===selY ? ' selected' : '');
         var blockName = t.grid[r][c];
-        var pdef = blockName ? resources.block[blockName] : null;
-        cell.style.background = pdef ? pdef.color : '#1c1926';
-        if(pdef && pdef.spriteUrl){
-          cell.style.backgroundImage = 'url("'+pdef.spriteUrl+'")';
-          cell.style.backgroundSize = 'cover';
-          cell.style.backgroundPosition = 'center';
-        }
+        cell.style.background = (blockName && resources.block[blockName]) ? resources.block[blockName].color : '#1c1926';
         cell.addEventListener('click', (function(cx,cy){ return function(){ onPick(cx,cy); }; })(c,r));
         gridEl.appendChild(cell);
       }
@@ -1558,10 +1630,18 @@
   document.getElementById('connectorEditBtn').addEventListener('click', openConnectorModal);
 
   // ---------------- init ----------------
-  if(!loadLocal()){ applyDefaults(); }
+  if (EXPORTED_GAME) {
+    resources = EXPORTED_GAME.resources || resources;
+    ['block','character','npc','mob','item','custom'].forEach(function(t){ if(!resources[t]) resources[t] = {}; });
+    codeInput.value = EXPORTED_GAME.script || '';
+    document.body.classList.add('standaloneGame');
+  } else if(!loadLocal()){
+    applyDefaults();
+  }
   ensureRoadBlockSeeded();
   refreshPalette();
   runCode();
+  if (EXPORTED_GAME) { enterPlayMode(); }
 })();
 </script>
 </body>

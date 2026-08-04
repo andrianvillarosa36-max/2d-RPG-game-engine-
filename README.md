@@ -118,14 +118,8 @@ Two layers, on purpose:
 
 Typing `engine.setBlock(x, y, "Grass")` fifty times to fill a map gets old
 fast. **+ Terrain** (and **Edit Terrain** — same tool) opens a full-screen
-painter: the grid is up top, and the tabs, palette, and Cancel/Done buttons
-all live in a panel anchored to the **bottom** of the screen. The palette
-isn't just blocks — every Character, NPC, and Mob resource shows up there
-too (with its kind icon on the swatch), so placing Hero, an NPC, or a mob
-is the same tap-to-place motion as painting Grass, not a separate step in
-the code. Anything new you create with **+ Block** / **+ Character** /
-**+ NPC** / **+ Mob** appears here automatically, same as it always did
-for blocks - there's nothing extra to wire up.
+painter: the grid is up top, and the tabs, block palette, and Cancel/Done
+buttons all live in a panel anchored to the **bottom** of the screen.
 
 **Why the bottom:** the first version pinned those controls near the top,
 which turned out to sit right under the status bar / camera cutout on a
@@ -152,19 +146,6 @@ itself, pre-filled with a suggested name when you tap **+ Terrain**. Every
 other popup (`alert()`) in the editor got replaced the same way, with a
 message that appears in the modal instead of a dialog that may not have
 been showing at all.
-
-**Placing Character/NPC/Mob through the painter won't duplicate one you
-already have.** Tapping a cell with an entity brush selected doesn't just
-add a call to your script blindly — it actively removes any existing
-placement of that same entity first. For **Character** specifically, that
-means *anywhere* in your script, since there's only ever meant to be one
-Hero; moving it through the painter cleans up the old spot automatically.
-For **NPC and Mob**, only an exact position match gets replaced, so you
-can still have five different Slimes scattered around — placing a sixth
-doesn't touch the other five. Reopening the painter also reads back
-whatever it placed last time (it's the only thing that ever manages that
-part of your script), so your existing NPCs and Mobs show up already
-there instead of looking like they vanished.
 
 The tab bar at the top of the painter is what makes this multiple *places*
 instead of one big room: each tab is a separate 9×6 terrain with its own
@@ -201,22 +182,11 @@ checkbox are just faster ways to write parts of it. Hand-editing inside
 
 ## Sprite images
 
-Every resource type — Block included — can carry an uploaded image
-instead of a flat colour. Open **Edit Block** (or Character/NPC/Mob/
-Item/Custom) → "Texture image" / "Sprite image" → pick a PNG from your
-phone (made in Pixel Studio or anywhere else). It's stored as the image
-data itself inside the resource, so it travels with autosave and
-Export/Import automatically — no separate asset files to manage. It
-shows up everywhere that resource does: the live preview, the palette
-chip, and the terrain painter's swatches and grid - paint with it and
-the grid actually looks like the ground you're placing, not just its
-average colour.
-
-The **live preview and play mode** draw blocks edge-to-edge with no grid
-lines between them, so adjacent textures blend into continuous terrain
-instead of looking like a checkerboard of tiles. The **terrain painter**
-still shows its own thin grid, on purpose — that one's a tool for placing
-things precisely, not the view your Hero actually walks around in.
+Every resource type except Block can carry an uploaded image instead of a
+flat colour circle — open **Edit Character** (or NPC/Mob/Item/Custom) →
+"Sprite image" → pick a photo/PNG from your phone. It's stored as the
+image data itself inside the resource, so it travels with autosave and
+Export/Import automatically — no separate asset files to manage.
 
 *(If you tried this before and the picker never opened: that was a real
 bug, not something you did wrong — a plain Android WebView doesn't let
@@ -233,35 +203,17 @@ rather than a walk cycle, tell me the layout in chat and I'll change the
 logic to pick a row by direction instead of just cycling — I didn't want
 to guess wrong from the image alone and lock in the wrong behaviour.
 
-## App icon
-
-A gear at the centre, eight spokes radiating out - meant to read as both
-"engine" and "terrains connected to each other," in the app's actual gold
-on deep indigo instead of the generic blue-on-green a stock icon usually
-comes in. Colours are the exact same `--gold`/`--ink`/`--rune` values the
-rest of the app uses, so the icon and the app it opens actually look like
-the same product.
-
-It ships two ways: a plain square PNG for older devices, and a proper
-Android adaptive icon (background colour + separate foreground layer) for
-API 26+, so it gets a clean circle/squircle/rounded-square mask instead of
-whatever crude auto-crop a launcher would apply to a flat image. Regenerate
-it anytime with `python3 gen_icon.py` if you want to tweak colours or
-proportions — it's plain PIL, no image editor needed.
-
 ## Project layout
 
 ```
 MiniEngine2D/
 ├── preview.html                 ← the engine, standalone (for browser testing)
-├── gen_icon.py                  ← regenerates the app icon (plain PIL)
 ├── app/
 │   ├── build.gradle              ← app module config
 │   └── src/main/
 │       ├── AndroidManifest.xml
 │       ├── java/.../MainActivity.kt   ← WebView shell + orientation/file-picker bridges
-│       ├── assets/index.html     ← same engine, bundled into the APK
-│       └── res/mipmap-*/, values/colors.xml   ← app icon (legacy + adaptive)
+│       └── assets/index.html     ← same engine, bundled into the APK
 ├── build.gradle                  ← root: plugin versions
 ├── settings.gradle
 ├── gradle.properties
@@ -309,6 +261,35 @@ get `app-debug.apk`.
 this source the first time — that's expected for a debug build you built
 yourself.
 
+## Turning an exported game into an APK
+
+**Export** in the toolbar exports this *project* (resources + script) as
+JSON, for backing up or handing off to edit later. **Export Game (HTML)** is
+different: it produces a `game.html` that plays your game immediately with
+no editor at all - same engine, same rendering and controls, just with the
+editor chrome stripped out and your project baked in as data instead of
+loaded from storage.
+
+A WebView can't invoke a compiler, so `game.html` on its own is not an APK -
+turning it into one reuses the exact build you already have working:
+
+1. Tap **Export Game (HTML)**. It downloads `game.html`.
+2. Duplicate this whole project folder under a new name (e.g. `my-game-app`).
+   Give it its own GitHub repo too - keep the editor project and each
+   exported game as separate repos rather than overwriting one with the other.
+3. In the copy, replace **both** `app/src/main/assets/index.html` and
+   `preview.html` with the exported `game.html` (same filename, `index.html`
+   and `preview.html`, so nothing else needs to change).
+4. Optional: `app/src/main/AndroidManifest.xml` has
+   `android:label="MiniEngine2D"` — change that string to your game's actual
+   name so it doesn't show up on the home screen labeled "MiniEngine2D".
+5. Push it and let the same `.github/workflows/build-apk.yml` build it -
+   nothing about the workflow itself needs to change, it just builds
+   whatever's in `assets/index.html` now, which is your game.
+
+The result is a real, standalone, installable APK of just your game - no
+toolbar, no code editor, launches straight into it.
+
 ## Why these versions
 
 `build.gradle` pins **AGP 8.7.0 / Kotlin 2.0.21 / compileSdk 35**, and the
@@ -327,6 +308,8 @@ later is a good phase-2 task once the basics are working.
 
 ## Known limitations (v1)
 
+- **Blocks are still colour-only** — sprite images work for Character/NPC/
+  Mob/Item/Custom, but terrain blocks are flat coloured squares for now.
 - **Sprite animation is a simple frame-cycle**, not direction-aware — see
   "Sprite images" above.
 - **Each terrain is a fixed 9×6 grid** — multiple terrains linked by doors
@@ -347,13 +330,14 @@ later is a good phase-2 task once the basics are working.
 
 1. **Real code editor** — swap the `<textarea>` for CodeMirror (line
    numbers, syntax highlighting, bracket matching).
-2. **Two-way terrain links** — auto-create (or at least suggest) a return
+2. **Block textures** — image support for terrain blocks, not just entities.
+3. **Two-way terrain links** — auto-create (or at least suggest) a return
    door when you link one terrain to another.
-3. **Mob AI** — patrol/chase behaviour instead of standing still. Would
+4. **Mob AI** — patrol/chase behaviour instead of standing still. Would
    want its own sprite animation too, once mobs actually move.
-4. **Named, multi-project saves** — right now there's one autosave slot;
+5. **Named, multi-project saves** — right now there's one autosave slot;
    a proper "Save As" using Android's file picker
    (`Intent.ACTION_CREATE_DOCUMENT`) would allow several named projects.
-5. **Export finished games separately** — MiniEngine2D packages *your* game
+6. **Export finished games separately** — MiniEngine2D packages *your* game
    as its own APK, GDevelop-style. This is the long-term goal and a
    substantial project on its own — worth tackling once the basics feel solid.
