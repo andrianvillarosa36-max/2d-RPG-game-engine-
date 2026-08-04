@@ -99,6 +99,30 @@ API is unreliable inside a plain WebView. That means it's solid in the
 installed app; testing `preview.html` in a desktop browser just shows the
 fullscreen layout without rotating anything (nothing to rotate).
 
+## Animation
+
+The canvas redraws continuously now (a `requestAnimationFrame` loop),
+not just when something changes, which is what makes the rest of this
+possible:
+
+- **Movement slides** instead of teleporting — a short eased motion
+  between cells, capped well under the fastest joystick repeat rate so
+  a new step never cuts an old one off mid-slide.
+- **Everything breathes** — Hero, NPCs, and Mobs bob gently up and down
+  on their own, out of sync with each other (each gets a random phase at
+  spawn) so the world doesn't look frozen even when nothing's happening.
+- **Hits flash** — a brief white pulse on both sides of a bump, so combat
+  reads as an impact instead of just numbers changing.
+- **Connectors pulse** — the gold ring breathes in and out, a small cue
+  that it's something to interact with rather than decoration.
+
+One visual trade-off from this pass: the dark inset border that used to
+mark solid blocks is gone (it fought with textured art — see a screenshot
+of a tree in a square frame and you'll see why). Solid still works exactly
+the same for movement, you just find out from bumping into it and reading
+the status line rather than seeing it in advance. Open to a subtler way to
+show it if that turns out to matter in practice.
+
 ## Save / Load
 
 Two layers, on purpose:

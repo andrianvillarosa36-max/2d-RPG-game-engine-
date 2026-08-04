@@ -359,6 +359,8 @@
   "use strict";
 
   var HERO_ATTACK_DAMAGE = 25;
+  var MOVE_ANIM_MS = 110;
+  var FLASH_MS = 220;
   var MOB_ATTACK_DAMAGE = 10;
 
   // ---------------- Resource store (the "palette" - persists across script runs) ----------------
@@ -454,7 +456,8 @@
   }
   function currentTerrain(){ return ensureTerrain(scene.active); }
 
-  function render(){
+  function render(now){
+    if(now == null) now = performance.now();
     document.getElementById('gridInfo').textContent = scene.active + ' \u00B7 ' + COLS + '\u00D7' + ROWS;
     var t = currentTerrain();
     ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -477,16 +480,13 @@
           ctx.fillStyle = def ? def.color : "#555";
           ctx.fillRect(bx, by, bw, bh);
         }
-        if (def && def.solid) {
-          ctx.strokeStyle = 'rgba(13,11,24,.55)';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(c*CELL+3, r*CELL+3, CELL-6, CELL-6);
-        }
       }
     }
 
     (t.connectors||[]).forEach(function(conn){
       var cx = conn.x*CELL + CELL/2, cy = conn.y*CELL + CELL/2;
+      var pulse = 0.65 + Math.sin(now/450)*0.35;
+      ctx.globalAlpha = pulse;
       ctx.beginPath();
       ctx.arc(cx, cy, CELL*0.34, 0, Math.PI*2);
       ctx.strokeStyle = '#ffb648';
@@ -495,9 +495,10 @@
       ctx.fillStyle = '#ffb648';
       ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('\u2192', cx, cy+5);
+      ctx.globalAlpha = 1;
     });
 
-    t.entities.forEach(function(e){ drawEntity(e); });
+    t.entities.forEach(function(e){ drawEntity(e, now); });
   }
 
   var spriteCache = {};
@@ -512,8 +513,32 @@
     return img;
   }
 
-  function drawEntity(e){
-    var px = e.x*CELL, py = e.y*CELL;
+  function drawFlash(cx, cy, e, now){
+    if(!e._flashUntil || now >= e._flashUntil) return;
+    var remain = Math.max(0, (e._flashUntil - now) / FLASH_MS);
+    ctx.globalAlpha = remain * 0.7;
+    ctx.beginPath();
+    ctx.arc(cx, cy, CELL*0.36, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawEntity(e, now){
+    var gx = e.x, gy = e.y;
+    if(e._animStart != null){
+      var prog = (now - e._animStart) / MOVE_ANIM_MS;
+      if(prog < 1){
+        var ease = 1 - Math.pow(1-prog, 2);
+        gx = e._animFromX + (e.x - e._animFromX) * ease;
+        gy = e._animFromY + (e.y - e._animFromY) * ease;
+      } else {
+        e._animStart = null;
+      }
+    }
+    var cx = gx*CELL + CELL/2;
+    var cy = gy*CELL + CELL/2 + Math.sin(now/280 + (e._bobPhase||0)) * 1.6;
+
     if(e.spriteUrl){
       var img = getSpriteImage(e.spriteUrl);
       if(img.complete && img.naturalWidth){
@@ -521,12 +546,13 @@
         var fw = img.naturalWidth/cols, fh = img.naturalHeight/rows;
         var frame = (e.animFrame||0) % (cols*rows);
         var fx = (frame % cols) * fw, fy = Math.floor(frame/cols) * fh;
-        ctx.drawImage(img, fx, fy, fw, fh, px+3, py+3, CELL-6, CELL-6);
+        var size = CELL-6;
+        ctx.drawImage(img, fx, fy, fw, fh, cx-size/2, cy-size/2, size, size);
+        drawFlash(cx, cy, e, now);
         return;
       }
       // sprite still loading (or failed) - fall through to the shape below as a placeholder
     }
-    var cx = px + CELL/2, cy = py + CELL/2;
     ctx.beginPath();
     ctx.arc(cx,cy,CELL*0.32,0,Math.PI*2);
     ctx.fillStyle = e.color;
@@ -534,6 +560,7 @@
     ctx.lineWidth=2; ctx.strokeStyle="rgba(13,11,24,.5)"; ctx.stroke();
     ctx.fillStyle="#0d0b18"; ctx.font="11px sans-serif"; ctx.textAlign="center";
     ctx.fillText(TYPE_META[e.kind].icon, cx, cy+4);
+    drawFlash(cx, cy, e, now);
   }
 
   function setStatus(text, isError){
@@ -559,7 +586,7 @@
     function addEntity(kind,name,x,y,terrain){
       var def = resources[kind][name];
       if(!def) throw new Error('add'+cap(kind)+': no ' + kind + ' resource named "'+name+'" - create one with the + ' + cap(kind) + ' button');
-      var entity = { kind:kind, name:name, x:x, y:y, color:def.color, animFrame:0 };
+      var entity = { kind:kind, name:name, x:x, y:y, color:def.color, animFrame:0, _bobPhase: Math.random()*Math.PI*2 };
       for (var k in def) if (entity[k] === undefined) entity[k] = def[k];
       if (entity.health != null) entity.maxHealth = entity.health;
       ensureTerrain(terrain||DEFAULT_TERRAIN).entities.push(entity);
@@ -653,8 +680,11 @@
   // ---------------- Movement / collision / combat ----------------
   function performAttack(hero, mob){
     var t = currentTerrain();
+    var now = performance.now();
     mob.health -= HERO_ATTACK_DAMAGE;
     hero.health -= MOB_ATTACK_DAMAGE;
+    mob._flashUntil = now + FLASH_MS;
+    hero._flashUntil = now + FLASH_MS;
     if(mob.health <= 0){
       t.entities = t.entities.filter(function(e){ return e!==mob; });
       setStatus(mob.name+' defeated!', false);
@@ -707,6 +737,7 @@
       setStatus('Picked up '+item.name+(item.effect?' ('+item.effect+')':'')+'!', false);
     }
 
+    hero._animFromX = hero.x; hero._animFromY = hero.y; hero._animStart = performance.now();
     hero.x = nx; hero.y = ny;
     hero.animFrame = (hero.animFrame||0) + 1;
     render(); updateHud(); updateActionButton();
@@ -1562,6 +1593,15 @@
   ensureRoadBlockSeeded();
   refreshPalette();
   runCode();
+
+  // Continuous redraw for idle bob / movement tweens / hit flashes / the
+  // connector pulse - everything else in the engine still only recomputes
+  // state reactively (on a move, a run, etc.), this loop just keeps
+  // painting whatever that state is, smoothly, every frame.
+  (function animLoop(now){
+    render(now);
+    requestAnimationFrame(animLoop);
+  })();
 })();
 </script>
 </body>
