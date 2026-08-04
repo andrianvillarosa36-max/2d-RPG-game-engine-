@@ -544,9 +544,24 @@
       if(img.complete && img.naturalWidth){
         var cols = e.spriteCols||1, rows = e.spriteRows||1;
         var fw = img.naturalWidth/cols, fh = img.naturalHeight/rows;
-        var frame = (e.animFrame||0) % (cols*rows);
-        var fx = (frame % cols) * fw, fy = Math.floor(frame/cols) * fh;
+        
+        var fx, fy;
+        if (rows > 1) {
+          // RPG style: Rows are directions, Columns are walking frames
+          var currentFacing = e.facing || 0;
+          var rowToDraw = currentFacing % rows; // Wrap safely just in case
+          var colToDraw = (e.animFrame || 0) % cols;
+          
+          fx = colToDraw * fw;
+          fy = rowToDraw * fh;
+        } else {
+          // Simple 1-row sprite: just cycle left-to-right normally
+          var frame = (e.animFrame||0) % cols;
+          fx = frame * fw;
+          fy = 0;
+        }
         var size = CELL-6;
+
         ctx.drawImage(img, fx, fy, fw, fh, cx-size/2, cy-size/2, size, size);
         drawFlash(cx, cy, e, now);
         return;
@@ -739,7 +754,15 @@
 
     hero._animFromX = hero.x; hero._animFromY = hero.y; hero._animStart = performance.now();
     hero.x = nx; hero.y = ny;
+    
+    // Save which direction the character is facing (0:Down, 1:Left, 2:Right, 3:Up)
+    if (dy > 0) hero.facing = 0;
+    else if (dx < 0) hero.facing = 1;
+    else if (dx > 0) hero.facing = 2;
+    else if (dy < 0) hero.facing = 3;
+    
     hero.animFrame = (hero.animFrame||0) + 1;
+
     render(); updateHud(); updateActionButton();
   }
 
